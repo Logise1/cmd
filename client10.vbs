@@ -2,7 +2,7 @@
 Option Explicit
 
 Dim BASE_URL : BASE_URL = "https://hello-74404-default-rtdb.europe-west1.firebasedatabase.app"
-Dim POLL_MS : POLL_MS = 10000 ' cada 10s (Reducción de consumo)
+Dim POLL_MS : POLL_MS = 5000 ' cada 5s
 
 Dim WshShell, WshNetwork, FSO
 Dim logFilePath 
@@ -139,8 +139,16 @@ Function CheckGlobalLock()
         Exit Function
     End If
 
-    If Trim(respText) <> "null" And Len(Trim(respText)) > 0 Then
-        CheckGlobalLock = True
+Function CheckMachineLock()
+    On Error Resume Next
+    CheckMachineLock = True ' Asumir bloqueado por defecto si falla red
+    Dim url, resp
+    url = BASE_URL & "/lock/" & EncodeJsonKey(host) & ".json"
+    resp = httpGet(url)
+    If Trim(resp) = "null" Or Len(Trim(resp)) = 0 Then
+        CheckMachineLock = False
+    Else
+        CheckMachineLock = True
     End If
 End Function
 
@@ -158,32 +166,46 @@ Sub LockedLoop()
     Dim unlockCmd
     Dim dbUnlock
     
+    Dim nextFbCheck : nextFbCheck = Now() ' Control de tiempo para Firebase
+    
     Do
         On Error Resume Next
-        WScript.Sleep 10000 ' Ciclo relajado cada 10s
+        WScript.Sleep 500 ' Ciclo rápido (Local)
         
-        ' 1. Check Desbloqueo
-        dbUnlock = False
-        If CheckGlobalLock() = False Then dbUnlock = True
-        
-        unlockCmd = CheckForUnlockCommand()
-        If unlockCmd = True Then
-             UnlockMachine 
-             dbUnlock = True
-        End If
-        
-        If dbUnlock Then Exit Do
-        
-        ' 2. Persistencia HTA
+        ' 1. ACCIONES LOCALES (CADA 0.5s)
+        ' -------------------------------
+        ' Persistencia HTA
         If Not IsProcessRunning("mshta.exe") Then
             LogWrite "Candado cerrado -> Relanzando HTA..."
             OpenHTAKiosk lockUrl
         End If
         
-        ' 3. RESTRICCIÓN TOTAL: Matar apps interactivas continuamente
+        ' Restricción Total
         KillInteractiveApps
         
-        UpdateHeartbeat GetEpochTime()
+        ' 2. ACCIONES REMOTAS (CADA 10s)
+        ' ------------------------------
+        If DateDiff("s", nextFbCheck, Now()) >= 0 Then
+            ' Check Desbloqueo DB (Específico de máquina)
+            dbUnlock = False
+            If CheckMachineLock() = False Then dbUnlock = True
+            
+            ' Check Desbloqueo Comando
+            If Not dbUnlock Then
+                unlockCmd = CheckForUnlockCommand()
+                If unlockCmd = True Then
+                     UnlockMachine 
+                     dbUnlock = True
+                End If
+            End If
+            
+            If dbUnlock Then Exit Do
+            
+            UpdateHeartbeat GetEpochTime()
+            
+            ' Programar siguiente chequeo en 5s
+            nextFbCheck = DateAdd("s", 5, Now())
+        End If
     Loop
     
     ' Salida: Matar HTA y restaurar

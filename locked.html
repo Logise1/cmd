@@ -359,6 +359,21 @@
             }
         };
     </script>
+    <script>
+        function toggleFullscreen() {
+            // En HTA maximizado por defecto, esto puede ser redundante pero evita el error.
+            if (!document.fullscreenElement) {
+                try { document.documentElement.requestFullscreen(); } catch (e) { }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // Auto-exec si se desea forzar al carga (opcional)
+        // window.onload = toggleFullscreen;
+    </script>
 </body>
 
 </html>
