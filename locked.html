@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOCKED</title>
+    <style>
+        /* Estilos base para centrado total */
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Fondo gris claro */
+            background-color: #d1d5db;
+            font-family: sans-serif;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Estilo del candado SVG */
+        .lock-icon {
+            /* Gris más oscuro */
+            fill: #4b5563;
+            width: 150px;
+            height: auto;
+            transition: transform 0.3s ease;
+        }
+
+        /* Pequeño efecto interactivo opcional */
+        .lock-icon:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- Icono de candado generado mediante SVG -->
+        <svg class="lock-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path
+                d="M12 2C9.243 2 7 4.243 7 7V10C5.895 10 5 10.895 5 12V19C5 20.105 5.895 21 7 21H17C18.105 21 19 20.105 19 19V12C19 10.895 18.105 10 17 10V7C17 4.243 14.757 2 12 2ZM9 7C9 5.346 10.346 4 12 4C13.654 4 15 5.346 15 7V10H9V7ZM12 14C12.552 14 13 14.448 13 15V16C13 16.552 12.552 17 12 17C11.448 17 11 16.552 11 16V15C11 14.448 11.448 14 12 14Z" />
+        </svg>
+    </div>
+
+</body>
+
+</html>

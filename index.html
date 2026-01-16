@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Control Center</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0f172a;
+      /* Slate 900 */
+      color: #e2e8f0;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+
+    /* Utilitarios */
+    .glass {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-icon {
+      @apply p-2 rounded-lg transition-all duration-200 flex items-center justify-center;
+    }
+
+    .terminal-text {
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    }
+
+    /* Animaciones */
+    @keyframes pulse-live {
+      0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+      }
+
+      70% {
+        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+      }
+    }
+
+    .live-indicator {
+      width: 10px;
+      height: 10px;
+      background-color: #ef4444;
+      border-radius: 50%;
+      animation: pulse-live 2s infinite;
+      display: inline-block;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+
+<body class="h-screen flex overflow-hidden">
+
+  <!-- SIDEBAR -->
+  <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-20 hidden md:flex">
+    <div class="p-6 flex items-center gap-3">
+      <div class="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center">
+        <i class="fa-solid fa-network-wired text-white text-sm"></i>
+      </div>
+      <h1 class="text-xl font-bold tracking-tight text-white">Control<span class="text-cyan-500">Center</span></h1>
+    </div>
+
+    <nav class="flex-1 px-4 space-y-2 mt-4">
+      <a href="#" onclick="switchView('dashboard')" id="nav-dashboard"
+        class="flex items-center gap-3 px-4 py-3 rounded-lg bg-slate-800 text-cyan-400 font-medium transition-colors">
+        <i class="fa-solid fa-grid-2"></i> Dashboard
+      </a>
+      <div class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-6">Acciones Rápidas</div>
+      <button onclick="broadcastCommand('/lock')"
+        class="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors text-left">
+        <i class="fa-solid fa-lock"></i> Bloquear Todos
+      </button>
+      <button onclick="broadcastCommand('/unlock')"
+        class="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-slate-400 hover:text-green-400 hover:bg-slate-800 transition-colors text-left">
+        <i class="fa-solid fa-lock-open"></i> Desbloquear Todos
+      </button>
+      <button onclick="broadcastCommand('shutdown /s /t 0')"
+        class="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors text-left">
+        <i class="fa-solid fa-power-off"></i> Apagar Todos
+      </button>
+    </nav>
+
+    <div class="p-4 border-t border-slate-800">
+      <div class="flex items-center gap-3">
+        <div class="w-2 h-2 rounded-full bg-green-500" id="server-status-dot"></div>
+        <span class="text-xs text-slate-400" id="server-status-text">Conectado</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="flex-1 flex flex-col relative overflow-hidden bg-slate-950">
+
+    <!-- HEADER MOVIL -->
+    <header class="md:hidden h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-20">
+      <h1 class="text-lg font-bold">ControlCenter</h1>
+      <button id="mobile-menu-btn" class="text-slate-400"><i class="fa-solid fa-bars text-xl"></i></button>
+    </header>
+
+    <!-- VIEWS CONTAINER -->
+    <div class="flex-1 overflow-hidden relative">
+
+      <!-- VISTA: DASHBOARD (GRID) -->
+      <div id="view-dashboard" class="absolute inset-0 overflow-y-auto p-6 transition-transform duration-300">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-semibold text-white">Dispositivos Conectados</h2>
+          <div class="text-sm text-slate-400">Total: <span id="machine-count" class="text-cyan-400 font-bold">0</span>
+          </div>
+        </div>
+
+        <div id="machines-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <!-- Cards insertadas por JS -->
+          <p class="text-slate-500 col-span-full text-center py-20">Esperando conexión de agentes...</p>
+        </div>
+      </div>
+
+      <!-- VISTA: DETALLE (LIVE MONITOR) -->
+      <div id="view-detail"
+        class="absolute inset-0 bg-slate-950 flex flex-col translate-x-full transition-transform duration-300 z-30">
+
+        <!-- Toolbar Superior -->
+        <div class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shadow-sm z-10">
+          <div class="flex items-center gap-4">
+            <button onclick="switchView('dashboard')" class="text-slate-400 hover:text-white transition-colors">
+              <i class="fa-solid fa-arrow-left text-lg"></i>
+            </button>
+            <div>
+              <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <span id="detail-name">...</span>
+                <span id="detail-status-dot" class="w-2 h-2 rounded-full bg-gray-500"></span>
+              </h2>
+              <div class="text-xs text-slate-400 flex gap-3">
+                <span id="detail-ip"><i class="fa-solid fa-network-wired mr-1"></i>...</span>
+                <span id="detail-user"><i class="fa-solid fa-user mr-1"></i>...</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button id="btn-live-toggle" onclick="toggleLiveMode()"
+              class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all flex items-center gap-2 border border-slate-700">
+              <i class="fa-solid fa-video"></i> Ver en Directo
+            </button>
+            <div class="h-6 w-px bg-slate-700 mx-1"></div>
+            <button onclick="sendDetailCommand('/lock')" class="btn-icon bg-slate-800 text-red-500 hover:bg-red-900/20"
+              title="Bloquear">
+              <i class="fa-solid fa-lock"></i>
+            </button>
+            <button onclick="sendDetailCommand('shutdown /s /t 0')"
+              class="btn-icon bg-slate-800 text-red-500 hover:bg-red-900/20" title="Apagar">
+              <i class="fa-solid fa-power-off"></i>
+            </button>
+            <button onclick="captureScreenshot()" class="btn-icon bg-slate-800 text-cyan-500 hover:bg-cyan-900/20"
+              title="Screenshot Instantánea">
+              <i class="fa-solid fa-camera"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Área Principal Dividida -->
+        <div class="flex-1 flex overflow-hidden">
+
+          <!-- Izquierda: Monitor / Screenshot -->
+          <div class="flex-1 bg-black relative flex items-center justify-center overflow-hidden p-4">
+            <div id="live-badge" class="absolute top-6 left-6 z-20 hidden">
+              <span class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center shadow-lg">
+                <span class="live-indicator bg-white"></span> LIVE
+              </span>
+            </div>
+
+            <img id="detail-image" src="" alt="Esperando imagen..."
+              class="max-w-full max-h-full object-contain shadow-2xl rounded-lg border border-slate-800"
+              style="display:none;">
+
+            <div id="detail-placeholder" class="text-center text-slate-600">
+              <i class="fa-solid fa-display text-6xl mb-4 opacity-20"></i>
+              <p>Sin señal de video</p>
+              <p class="text-sm mt-2">Pulsa "Ver en Directo" o captura una imagen.</p>
+            </div>
+          </div>
+
+          <!-- Derecha: Terminal y Logs -->
+          <div class="w-96 bg-slate-900 border-l border-slate-800 flex flex-col hidden lg:flex">
+            <div
+              class="p-3 bg-slate-800 border-b border-slate-700 text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Terminal Remota
+            </div>
+
+            <div id="console-output"
+              class="flex-1 p-4 overflow-y-auto terminal-text text-xs space-y-1 text-slate-300 custom-scroll">
+              <!-- Logs aquí -->
+            </div>
+
+            <form id="console-form" class="p-3 bg-slate-800 border-t border-slate-700 flex gap-2">
+              <span id="console-prompt" class="text-cyan-500 font-mono py-2 text-sm">C:\></span>
+              <input type="text" id="console-input"
+                class="flex-1 bg-transparent border-none focus:ring-0 text-white font-mono text-sm"
+                placeholder="Comando..." autocomplete="off">
+            </form>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Template Card -->
+  <template id="card-template">
+    <div class="rounded-xl glass p-5 flex flex-col gap-4 hover:border-cyan-500/50 transition-all cursor-pointer group"
+      onclick="selectMachine('NAME')">
+      <div class="flex justify-between items-start">
+        <div class="flex items-center gap-3">
+          <div
+            class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 text-xl icon-device">
+            <i class="fa-solid fa-desktop text-cyan-600"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white leading-tight name-text">...</h3>
+            <span class="text-xs text-slate-400 status-text">Offline</span>
+          </div>
+        </div>
+        <div class="w-2 h-2 rounded-full bg-slate-600 status-dot"></div>
+      </div>
+
+      <div class="h-24 bg-black rounded-lg border border-slate-700 overflow-hidden relative preview-container">
+        <img class="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity preview-img" src=""
+          style="display:none;">
+        <div class="absolute inset-0 flex items-center justify-center text-slate-600 no-preview-icon">
+          <i class="fa-regular fa-image text-2xl"></i>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 text-xs text-slate-400 mt-1">
+        <div class="bg-slate-800/50 rounded px-2 py-1 truncate"><i class="fa-solid fa-user mr-1 w-3 text-center"></i>
+          <span class="user-text">...</span>
+        </div>
+        <div class="bg-slate-800/50 rounded px-2 py-1 truncate"><i class="fa-solid fa-laptop mr-1 w-3 text-center"></i>
+          <span class="os-text">...</span>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Firebase Scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, onValue, set, remove, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const firebaseConfig = {
+      databaseURL: "https://cmdapp-e276d-default-rtdb.europe-west1.firebasedatabase.app",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Estado Local
+    let machines = {};
+    let selectedMachine = null;
+    let liveModeInterval = null;
+    let isLive = false;
+    let currentCWD = "C:\\";
+    let timeOffset = 0;
+
+    // Elementos DOM
+    const gridEl = document.getElementById('machines-grid');
+    const machineCountEl = document.getElementById('machine-count');
+    const viewDashboard = document.getElementById('view-dashboard');
+    const viewDetail = document.getElementById('view-detail');
+    const navDashboard = document.getElementById('nav-dashboard');
+
+    // Elementos Detalle
+    const detailName = document.getElementById('detail-name');
+    const detailIp = document.getElementById('detail-ip');
+    const detailUser = document.getElementById('detail-user');
+    const detailImage = document.getElementById('detail-image');
+    const detailPlaceholder = document.getElementById('detail-placeholder');
+    const btnLiveToggle = document.getElementById('btn-live-toggle');
+    const liveBadge = document.getElementById('live-badge');
+    const consoleOutput = document.getElementById('console-output');
+    const consoleInput = document.getElementById('console-input');
+    const consoleForm = document.getElementById('console-form');
+    const consolePrompt = document.getElementById('console-prompt');
+
+    // Init Logic
+    window.addEventListener('load', async () => {
+      await initTimeOffset();
+
+      // Check for ?cmdunlock
+      const urlParams = new URLSearchParams(window.location.search);
+      if (!urlParams.has('cmdunlock')) {
+        if (consoleForm) {
+          consoleForm.innerHTML = '<div class="text-xs text-slate-500 text-center italic">Terminal restringida.<br>Añade ?cmdunlock para acceso total.</div>';
+          consoleInput.disabled = true;
+        }
+      }
+
+      initListeners();
+    });
+
+    // --- Time Sync ---
+    async function initTimeOffset() {
+      try {
+        const response = await fetch("https://worldtimeapi.org/api/ip");
+        if (response.ok) {
+          const data = await response.json();
+          // worldtimeapi devuelve 'unixtime' que está en segundos
+          const serverTime = data.unixtime;
+          timeOffset = serverTime - Math.floor(Date.now() / 1000);
+          console.log("Time Offset:", timeOffset);
+        }
+      } catch (e) {
+        console.warn("Time sync error", e);
+        timeOffset = 0; // Fallback a 0
+      }
+    }
+    function getAdjustedTime() { return Math.floor(Date.now() / 1000) + timeOffset; }
+
+    // --- Firebase Listeners ---
+    function initListeners() {
+      // Escuchar todas las máquinas
+      onValue(ref(db, 'machines'), (snapshot) => {
+        machines = snapshot.val() || {};
+        renderGrid();
+        updateDetailIfOpen();
+      });
+    }
+
+    // --- Rendering ---
+    function renderGrid() {
+      gridEl.innerHTML = '';
+      const names = Object.keys(machines).sort();
+      machineCountEl.textContent = names.length;
+
+      if (names.length === 0) {
+        gridEl.innerHTML = '<p class="text-slate-500 col-span-full text-center py-20">No hay dispositivos...</p>';
+        return;
+      }
+
+      const tpl = document.getElementById('card-template').content;
+
+      names.forEach(name => {
+        const m = machines[name];
+        const lastSeen = m.status?.lastSeen;
+        const info = m.info || {};
+        const isOnline = lastSeen && (getAdjustedTime() - lastSeen < 40);
+
+        // Decodificar Base64 seguro
+        const user = safeB64(info.user);
+        const os = safeB64(info.os);
+
+        const el = tpl.cloneNode(true);
+        const card = el.querySelector('div'); // Root div
+        card.setAttribute('onclick', `selectMachine('${name}')`); // Hack por scope
+
+        el.querySelector('.name-text').textContent = name;
+        el.querySelector('.user-text').textContent = user || '?';
+        el.querySelector('.os-text').textContent = os || '?';
+        el.querySelector('.status-text').textContent = isOnline ? 'En línea' : `Visto: ${new Date((lastSeen + timeOffset) * 1000).toLocaleTimeString()}`;
+        el.querySelector('.status-dot').className = `w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-slate-600'}`;
+
+        // Preview de imagen si existe
+        if (m.screenshot && m.screenshot.data) {
+          const img = el.querySelector('.preview-img');
+          img.src = "data:image/jpeg;base64," + m.screenshot.data;
+          img.style.display = 'block';
+          el.querySelector('.no-preview-icon').style.display = 'none';
+        }
+
+        gridEl.appendChild(el);
+      });
+    }
+
+    // --- View Logic ---
+    window.selectMachine = function (name) {
+      selectedMachine = name;
+      switchView('detail');
+
+      // Reset Detail UI
+      detailName.textContent = name;
+      detailIp.innerHTML = `<i class="fa-solid fa-network-wired mr-1"></i> ${safeB64(machines[name]?.info?.ip) || '...'}`;
+      detailUser.innerHTML = `<i class="fa-solid fa-user mr-1"></i> ${safeB64(machines[name]?.info?.user) || '...'}`;
+
+      const cwdEncoded = machines[name]?.info?.cwd;
+      currentCWD = cwdEncoded ? safeB64(cwdEncoded) : "C:\\";
+      consolePrompt.textContent = currentCWD + ">";
+
+      consoleOutput.innerHTML = '<div class="text-slate-500 italic">Conectado a ' + name + '...</div>';
+
+      // Stop anterior live mode
+      stopLiveMode();
+
+      // Update image immediately if exists
+      const ssData = machines[name]?.screenshot?.data;
+      if (ssData) {
+        updateDetailImage(ssData);
+      } else {
+        detailImage.style.display = 'none';
+        detailPlaceholder.style.display = 'block';
+      }
+
+      // Configurar listeners específicos para el detalle (Consola)
+      setupConsoleListener(name);
+    };
+
+    window.switchView = function (view) {
+      if (view === 'dashboard') {
+        stopLiveMode();
+        viewDetail.classList.add('translate-x-full'); // Hide sidebar
+        setTimeout(() => viewDetail.classList.add('hidden'), 300); // Wait for transition
+        navDashboard.classList.add('bg-slate-800', 'text-cyan-400');
+      } else {
+        viewDetail.classList.remove('hidden');
+        requestAnimationFrame(() => viewDetail.classList.remove('translate-x-full'));
+        navDashboard.classList.remove('bg-slate-800', 'text-cyan-400');
+        navDashboard.classList.add('text-slate-400');
+      }
+    };
+
+    function updateDetailIfOpen() {
+      if (!selectedMachine || viewDetail.classList.contains('hidden')) return;
+
+      const m = machines[selectedMachine];
+      if (!m) return;
+
+      // Update Screen
+      if (m.screenshot?.data && (m.screenshot.id !== detailImage.dataset.lastId)) {
+        updateDetailImage(m.screenshot.data);
+        detailImage.dataset.lastId = m.screenshot.id;
+      }
+
+      // Update Status UI
+      const lastSeen = m.status?.lastSeen;
+      const isOnline = lastSeen && (getAdjustedTime() - lastSeen < 40);
+      document.getElementById('detail-status-dot').className = `w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`;
+    }
+
+    function updateDetailImage(b64) {
+      detailImage.src = "data:image/jpeg;base64," + b64;
+      detailImage.style.display = 'block';
+      detailPlaceholder.style.display = 'none';
+    }
+
+    // --- Live Mode Logic ---
+    window.toggleLiveMode = function () {
+      if (isLive) {
+        stopLiveMode();
+      } else {
+        startLiveMode();
+      }
+    }
+
+    function startLiveMode() {
+      if (!selectedMachine) return;
+      isLive = true;
+      btnLiveToggle.innerHTML = '<span class="live-indicator"></span> Detener Directo';
+      btnLiveToggle.classList.add('border-red-500/50', 'text-red-400', 'bg-red-900/10');
+      liveBadge.classList.remove('hidden');
+
+      // Enviar comando inicial
+      sendLiveCommand();
+
+      // Configurar loop de renovación (cada 15s para renovar el de 20s)
+      liveModeInterval = setInterval(() => {
+        if (!selectedMachine || !isLive) return;
+        sendLiveCommand();
+      }, 15000);
+    }
+
+    function stopLiveMode() {
+      isLive = false;
+      btnLiveToggle.innerHTML = '<i class="fa-solid fa-video"></i> Ver en Directo';
+      btnLiveToggle.classList.remove('border-red-500/50', 'text-red-400', 'bg-red-900/10');
+      liveBadge.classList.add('hidden');
+      if (liveModeInterval) clearInterval(liveModeInterval);
+      liveModeInterval = null;
+    }
+
+    async function sendLiveCommand() {
+      addToConsole("Iniciando modo LiveStream...", "info");
+      await sendFirebaseCommand(selectedMachine, "/livestream", currentCWD, false); // No borrar inmediatamente para que el script lo lea
+    }
+
+    window.captureScreenshot = async function () {
+      if (!selectedMachine) return;
+      addToConsole("Solicitando captura...", "info");
+      await sendFirebaseCommand(selectedMachine, "/screenshot", currentCWD);
+    }
+
+    // --- Console Logic ---
+    let consoleUnsub = null;
+    function setupConsoleListener(name) {
+      if (consoleUnsub) consoleUnsub(); // Detener listener anterior
+
+      const respRef = ref(db, `machines/${encodeKey(name)}/lastResponse`);
+      consoleUnsub = onValue(respRef, (snap) => {
+        const val = snap.val();
+        if (val && val.response) {
+          const id = val.id;
+          if (id !== consoleOutput.lastId) {
+            consoleOutput.lastId = id;
+            addToConsole(safeB64(val.response));
+          }
+        }
+      });
+    }
+
+    consoleForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const cmd = consoleInput.value.trim();
+      if (!cmd || !selectedMachine) return;
+
+      addToConsole(currentCWD + "> " + cmd, "user");
+
+      // Local CMDs
+      if (cmd.toLowerCase() === 'cls') {
+        consoleOutput.innerHTML = '';
+        consoleInput.value = '';
+        return;
+      }
+
+      sendFirebaseCommand(selectedMachine, cmd, currentCWD);
+      consoleInput.value = '';
+    });
+
+    function addToConsole(text, type = 'resp') {
+      const div = document.createElement('div');
+      div.className = type === 'user' ? 'text-cyan-300 font-bold mt-2' : (type === 'info' ? 'text-yellow-400' : 'text-slate-300 whitespace-pre-wrap');
+      div.textContent = text;
+      consoleOutput.appendChild(div);
+      consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    }
+
+    // --- Helpers ---
+    async function sendFirebaseCommand(name, cmd, cwd, autoRemove = true) {
+      const id = "cmd-" + Date.now();
+      const payload = { id, cmd, cwd };
+      const cmdRef = ref(db, `machines/${encodeKey(name)}/command`);
+      await set(cmdRef, payload);
+
+      if (autoRemove) {
+        setTimeout(() => remove(cmdRef), 6000);
+      }
+    }
+
+    window.broadcastCommand = function (cmd) {
+      if (!confirm("¿Enviar '" + cmd + "' a TODAS las máquinas?")) return;
+      Object.keys(machines).forEach(name => {
+        // Enviar a cada una con pequeño delay para no saturar si son muchas
+        sendFirebaseCommand(name, cmd, "C:\\", true);
+      });
+    }
+
+    window.sendDetailCommand = function (cmd) {
+      if (!selectedMachine) return;
+      if (!confirm("¿Enviar '" + cmd + "' a " + selectedMachine + "?")) return;
+      sendFirebaseCommand(selectedMachine, cmd, currentCWD);
+    }
+
+    function safeB64(str) {
+      if (!str) return "";
+      try { return decodeURIComponent(escape(window.atob(str))); } catch (e) { return str; }
+    }
+    function encodeKey(s) { return s.replace(/[.\$\[\]#\/ ]/g, "_"); }
+
+  </script>
+</body>
+
+</html>
