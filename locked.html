@@ -1,22 +1,14 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <title>LOCKED</title>
-    
+
     <!-- Configuración para Aplicación HTML (HTA) en Windows -->
-    <hta:application 
-        id="lockedApp" 
-        applicationname="locked" 
-        border="none" 
-        caption="no" 
-        showintaskbar="no" 
-        sysmenu="no"
-        windowstate="maximize" 
-        navigable="yes" 
-        scroll="no" 
-    />
+    <hta:application id="lockedApp" applicationname="locked" border="none" caption="no" showintaskbar="no" sysmenu="no"
+        windowstate="maximize" navigable="yes" scroll="no" />
 
     <style>
         /* Reset y Estilos Base */
@@ -28,8 +20,10 @@
 
         body {
             font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-            overflow: hidden; /* Evitar barras de desplazamiento */
-            user-select: none; /* Evitar seleccionar texto */
+            overflow: hidden;
+            /* Evitar barras de desplazamiento */
+            user-select: none;
+            /* Evitar seleccionar texto */
             height: 100vh;
             width: 100vw;
             display: flex;
@@ -45,9 +39,17 @@
 
         /* Animación del Fondo */
         @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
         }
 
         /* Contenedor central */
@@ -62,16 +64,28 @@
             width: 120px;
             height: 120px;
             margin-bottom: 2rem;
-            fill: #5eead4; /* Teal-300 */
+            fill: #5eead4;
+            /* Teal-300 */
             opacity: 0.9;
             filter: drop-shadow(0 0 10px rgba(94, 234, 212, 0.3));
             animation: gentle-pulse 4s infinite ease-in-out;
         }
 
         @keyframes gentle-pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; }
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         /* Tipografía */
@@ -80,13 +94,15 @@
             font-weight: 300;
             margin-bottom: 1rem;
             letter-spacing: -2px;
-            color: #f0fdfa; /* Teal-50 */
-            text-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            color: #f0fdfa;
+            /* Teal-50 */
+            text-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
 
         p {
             font-size: 1.8rem;
-            color: #ccfbf1; /* Teal-100 */
+            color: #ccfbf1;
+            /* Teal-100 */
             font-weight: 300;
             opacity: 0.8;
             max-width: 700px;
@@ -99,15 +115,17 @@
             margin-top: 3rem;
             display: inline-flex;
             align-items: center;
-            background-color: rgba(19, 78, 74, 0.4); /* Teal-900 con opacidad */
+            background-color: rgba(19, 78, 74, 0.4);
+            /* Teal-900 con opacidad */
             padding: 10px 24px;
             border-radius: 9999px;
             border: 1px solid rgba(20, 184, 166, 0.2);
-            backdrop-filter: blur(4px);
+            /* backdrop-filter eliminado por compatibilidad */
         }
 
         .status-text {
-            color: #99f6e4; /* Teal-200 */
+            color: #99f6e4;
+            /* Teal-200 */
             text-transform: uppercase;
             letter-spacing: 0.05em;
             font-size: 0.875rem;
@@ -127,7 +145,8 @@
             height: 100%;
             width: 100%;
             border-radius: 50%;
-            background-color: #2dd4bf; /* Teal-400 */
+            background-color: #2dd4bf;
+            /* Teal-400 */
             opacity: 0.75;
             animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
         }
@@ -137,11 +156,17 @@
             height: 12px;
             width: 12px;
             border-radius: 50%;
-            background-color: #14b8a6; /* Teal-500 */
+            background-color: #14b8a6;
+            /* Teal-500 */
         }
 
         @keyframes ping {
-            75%, 100% { transform: scale(2); opacity: 0; }
+
+            75%,
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
         }
 
         /* Elementos de las esquinas */
@@ -202,25 +227,39 @@
 
         /* Media Queries para pantallas más pequeñas */
         @media (max-width: 768px) {
-            h1 { font-size: 3rem; }
-            p { font-size: 1.2rem; }
-            .main-icon { width: 80px; height: 80px; }
+            h1 {
+                font-size: 3rem;
+            }
+
+            p {
+                font-size: 1.2rem;
+            }
+
+            .main-icon {
+                width: 80px;
+                height: 80px;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <!-- Info Superior -->
+    <div class="corner-info top-left">
+        Modo Concentración
+    </div>
 
     <!-- Contenido Central -->
     <div class="center-content">
         <!-- SVG Icono Ojo -->
         <svg class="main-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+            <path
+                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
         </svg>
 
         <h1>Vista al frente</h1>
-        
+
         <p>
             Hacemos una pequeña pausa en los ordenadores.<br>
             Escuchemos la explicación.
@@ -239,7 +278,8 @@
     <div class="corner-info bottom-left">
         <!-- SVG Icono Reloj -->
         <svg class="clock-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8 8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+            <path
+                d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8 8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
         </svg>
         <span id="clock">00:00:00</span>
     </div>
@@ -248,19 +288,27 @@
     <button onclick="toggleFullScreen()" class="fullscreen-btn" title="Pantalla Completa">
         <!-- SVG Icono Expandir -->
         <svg class="expand-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
         </svg>
     </button>
 
     <script>
-        // Reloj
+        // Reloj - Reescrito para compatibilidad total (Sin ES6)
         function updateClock() {
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+            var now = new Date();
+            var h = now.getHours();
+            var m = now.getMinutes();
+            var s = now.getSeconds();
+
+            // Lógica manual para añadir el cero delante si es menor que 10
+            var hours = (h < 10 ? "0" : "") + h;
+            var minutes = (m < 10 ? "0" : "") + m;
+            var seconds = (s < 10 ? "0" : "") + s;
+
+            // Concatenación clásica (compatible con HTA/IE antiguo)
+            document.getElementById('clock').innerText = hours + ":" + minutes + ":" + seconds;
         }
+
         setInterval(updateClock, 1000);
         updateClock();
 
@@ -276,13 +324,13 @@
                     }
                 }
             } catch (e) {
-                console.log("No es entorno HTA/WScript");
+                // Ignorar error silenciosamente en HTA si falla
             }
 
             // Intento Web Estándar
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.log(`Error: ${err.message}`);
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(function (err) {
+                    console.log("Error pantalla completa: " + err.message);
                 });
             } else {
                 if (document.exitFullscreen) {
@@ -292,18 +340,25 @@
         }
 
         // Bloqueos (Efectivos en modo quiosco web, limitados en HTA según configuración)
-        document.addEventListener('contextmenu', event => event.preventDefault());
-        
+        document.oncontextmenu = function () { return false; };
+
         document.onkeydown = function (e) {
-            // F12, F5, Ctrl+R, Ctrl+U
-            if(e.keyCode === 123 || e.keyCode === 116 || (e.ctrlKey && e.keyCode === 82) || (e.ctrlKey && e.keyCode === 85)) {
+            e = e || window.event; // Compatibilidad evento IE antiguo
+            var code = e.keyCode || e.which;
+
+            // F12 (123), F5 (116), Ctrl+R (82), Ctrl+U (85)
+            if (code === 123 || code === 116) {
                 return false;
             }
-            // Alt+F4 (Intento, generalmente bloqueado por SO)
-            if(e.altKey && e.keyCode === 115) {
+            if (e.ctrlKey && (code === 82 || code === 85)) {
+                return false;
+            }
+            // Alt+F4 (Intento)
+            if (e.altKey && code === 115) {
                 return false;
             }
         };
     </script>
 </body>
+
 </html>
