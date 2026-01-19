@@ -139,6 +139,11 @@ Function CheckGlobalLock()
         Exit Function
     End If
 
+    If Trim(respText) <> "null" And Len(Trim(respText)) > 0 Then
+        CheckGlobalLock = True
+    End If
+End Function
+
 Function CheckMachineLock()
     On Error Resume Next
     CheckMachineLock = True ' Asumir bloqueado por defecto si falla red
