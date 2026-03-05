@@ -369,6 +369,8 @@
     let globalLiveInterval = null;
     let isGlobalLive = false;
 
+    let nitroInterval = null;
+
     // Elementos DOM
     const gridEl = document.getElementById('machines-grid');
     const machineCountEl = document.getElementById('machine-count');
@@ -501,11 +503,14 @@
         detailPlaceholder.style.display = 'block';
       }
 
+      startNitro(name);
     };
 
     window.switchView = function (view) {
       if (view === 'dashboard') {
         stopLiveMode();
+        stopNitro();
+        selectedMachine = null;
         viewDetail.classList.add('translate-x-full'); // Hide sidebar
         setTimeout(() => viewDetail.classList.add('hidden'), 300); // Wait for transition
         navDashboard.classList.add('bg-slate-800', 'text-cyan-400');
@@ -568,9 +573,6 @@
       btnLiveToggle.classList.remove('bg-slate-800', 'text-slate-300');
       liveBadge.classList.remove('hidden');
 
-      // Enviar comando para ajustar el polling de comandos MUY RÁPIDO mientras hay stream
-      sendFirebaseCommand(selectedMachine, "/pollrate 500", currentCWD, false);
-
       // Enviar comando inicial
       sendLiveCommand();
 
@@ -591,8 +593,6 @@
       liveModeInterval = null;
       if (selectedMachine) {
         sendFirebaseCommand(selectedMachine, "/stoplivestream", currentCWD, false);
-        // Volver a polling lento (5000ms)
-        setTimeout(() => sendFirebaseCommand(selectedMachine, "/pollrate 5000", currentCWD, false), 500);
       }
     }
 
@@ -621,11 +621,6 @@
         btnGlobalLive.classList.remove('bg-slate-800', 'text-slate-300');
       }
 
-      // Enviar ajuste de pollrate global
-      Object.keys(machines).forEach(name => {
-        sendFirebaseCommand(name, "/pollrate 500", "C:\\", false);
-      });
-
       sendGlobalLiveCommand();
 
       // Loop de renovación a TODOS (cada 15s)
@@ -649,7 +644,6 @@
       globalLiveInterval = null;
       Object.keys(machines).forEach(name => {
         sendFirebaseCommand(name, "/stoplivestream", "C:\\", false);
-        setTimeout(() => sendFirebaseCommand(name, "/pollrate 5000", "C:\\", false), 500);
       });
     }
 
@@ -681,6 +675,24 @@
       if (autoRemove) {
         setTimeout(() => remove(cmdRef), 6000);
       }
+    }
+
+    // --- Funciones MODO NITRO (1s) ---
+    function startNitro(name) {
+      if (nitroInterval) clearInterval(nitroInterval);
+      sendFirebaseCommand(name, "/nitro", currentCWD, false);
+      nitroInterval = setInterval(() => {
+        if (selectedMachine === name) {
+          sendFirebaseCommand(name, "/nitro", currentCWD, false);
+        } else {
+          stopNitro();
+        }
+      }, 20000); // renovar cada 20s
+    }
+
+    function stopNitro() {
+      if (nitroInterval) clearInterval(nitroInterval);
+      nitroInterval = null;
     }
 
     window.broadcastCommand = function (cmd) {
