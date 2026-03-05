@@ -8,7 +8,7 @@ Dim WshShell, WshNetwork, FSO
 Dim logFilePath 
 
 ' --- AUTO UPDATE LOGIC ---
-Dim CURRENT_VERSION : CURRENT_VERSION = "v1.2"
+Dim CURRENT_VERSION : CURRENT_VERSION = "v1.3"
 Dim VERSION_URL : VERSION_URL = "https://logise1.github.io/cmd/version.txt"
 Dim UPDATE_URL : UPDATE_URL = "https://logise1.github.io/cmd/client10.vbs"
 
