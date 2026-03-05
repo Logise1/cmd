@@ -8,7 +8,7 @@ Dim WshShell, WshNetwork, FSO
 Dim logFilePath 
 
 ' --- AUTO UPDATE LOGIC ---
-Dim CURRENT_VERSION : CURRENT_VERSION = "v1.3"
+Dim CURRENT_VERSION : CURRENT_VERSION = "v1.4"
 Dim VERSION_URL : VERSION_URL = "https://logise1.github.io/cmd/version.txt"
 Dim UPDATE_URL : UPDATE_URL = "https://logise1.github.io/cmd/client10.vbs"
 
@@ -107,7 +107,13 @@ Sub CheckUpdate()
     req.open "GET", VERSION_URL & "?t=" & Timer(), False
     req.send
     If req.Status = 200 Then
-        remoteVer = Trim(req.responseText)
+        remoteVer = req.responseText
+        remoteVer = Replace(remoteVer, vbCrLf, "")
+        remoteVer = Replace(remoteVer, vbCr, "")
+        remoteVer = Replace(remoteVer, vbLf, "")
+        remoteVer = Replace(remoteVer, vbTab, "")
+        remoteVer = Trim(remoteVer)
+        
         If remoteVer <> "" And remoteVer <> CURRENT_VERSION Then
             LogWrite "Nueva version detectada: " & remoteVer
             Dim reqSc, newSrc
