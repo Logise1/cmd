@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -133,14 +134,15 @@
       <div id="view-dashboard" class="absolute inset-0 overflow-y-auto p-6 transition-transform duration-300">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <h2 class="text-2xl font-semibold text-white">Dispositivos Conectados</h2>
-          
+
           <div class="flex items-center gap-4">
             <!-- Botón de Directo Global -->
             <button id="btn-global-live" onclick="toggleGlobalLiveMode()"
               class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all flex items-center gap-2 border border-slate-700 text-sm font-medium">
               <i class="fa-solid fa-video"></i> Directo Global
             </button>
-            <div class="text-sm text-slate-400 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700">Total: <span id="machine-count" class="text-cyan-400 font-bold">0</span>
+            <div class="text-sm text-slate-400 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700">Total: <span
+                id="machine-count" class="text-cyan-400 font-bold">0</span>
             </div>
           </div>
         </div>
@@ -154,7 +156,7 @@
       <!-- VISTA: DETALLE (LIVE MONITOR) -->
       <div id="view-detail"
         class="absolute inset-0 bg-slate-950 flex flex-col translate-x-full transition-transform duration-300 z-30 hidden">
-        
+
         <!-- Toolbar Superior -->
         <div class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shadow-sm z-10">
           <div class="flex items-center gap-4">
@@ -214,19 +216,77 @@
               <p class="text-sm mt-2">Pulsa "Ver en Directo" o captura una imagen.</p>
             </div>
           </div>
-          
-          <!-- Derecha: Terminal -->
-          <div class="w-full lg:w-[400px] h-64 lg:h-full flex flex-col bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 z-10">
-             <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
-               <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-terminal text-cyan-500"></i> Terminal CMD</h3>
-               <button onclick="document.getElementById('terminal-output').innerHTML=''" class="text-slate-400 hover:text-white text-xs"><i class="fa-solid fa-trash"></i></button>
-             </div>
-             <div class="flex-1 p-3 overflow-y-auto font-mono text-xs text-green-400 bg-black whitespace-pre-wrap selection:bg-green-900 break-all" id="terminal-output"></div>
-             <div class="p-3 border-t border-slate-800 bg-slate-900 flex gap-2">
-               <span class="text-slate-500 font-mono mt-2" id="cwd-prompt">C:\></span>
-               <input type="text" id="terminal-input" class="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-2 text-sm text-white font-mono focus:outline-none focus:border-cyan-500" placeholder="dir, echo hola...">
-               <button onclick="sendTerminalCommand()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 rounded transition-colors"><i class="fa-solid fa-play"></i></button>
-             </div>
+
+          <!-- Derecha: Pestañas Terminal / Archivos -->
+          <div
+            class="w-full lg:w-[450px] h-64 lg:h-full flex flex-col bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 z-10">
+
+            <!-- Pestañas -->
+            <div class="flex border-b border-slate-800 bg-slate-950">
+              <button onclick="switchRightTab('terminal')" id="tab-btn-terminal"
+                class="flex-1 py-3 text-sm font-bold border-b-2 border-cyan-500 text-cyan-500 transition-colors">
+                <i class="fa-solid fa-terminal mr-2"></i> Terminal
+              </button>
+              <button onclick="switchRightTab('files')" id="tab-btn-files"
+                class="flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors">
+                <i class="fa-solid fa-folder-open mr-2"></i> Archivos
+              </button>
+            </div>
+
+            <!-- Tab: Terminal -->
+            <div id="tab-content-terminal" class="flex-1 flex flex-col min-h-0 bg-slate-900">
+              <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+                <h3 class="text-xs text-slate-400">Consola de Comandos</h3>
+                <button onclick="document.getElementById('terminal-output').innerHTML=''"
+                  class="text-slate-400 hover:text-white text-xs"><i class="fa-solid fa-trash"></i></button>
+              </div>
+              <div
+                class="flex-1 p-3 overflow-y-auto font-mono text-xs text-green-400 bg-black whitespace-pre-wrap selection:bg-green-900 break-all"
+                id="terminal-output"></div>
+              <div class="p-3 border-t border-slate-800 flex gap-2 w-full">
+                <span class="text-slate-500 font-mono mt-2" id="cwd-prompt">C:\></span>
+                <input type="text" id="terminal-input"
+                  class="flex-1 w-full bg-slate-800 border border-slate-700 rounded px-2 py-2 text-sm text-white font-mono focus:outline-none focus:border-cyan-500"
+                  placeholder="comando...">
+                <button onclick="sendTerminalCommand()"
+                  class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 rounded transition-colors"><i
+                    class="fa-solid fa-play"></i></button>
+              </div>
+            </div>
+
+            <!-- Tab: Archivos -->
+            <div id="tab-content-files" class="flex-1 flex flex-col min-h-0 bg-slate-900 hidden">
+              <div class="p-2 border-b border-slate-800 flex gap-2 items-center bg-slate-800/50 flex-wrap">
+                <button onclick="requestDir(currentCWD.split('\\').slice(0,-1).join('\\') || currentCWD)"
+                  class="p-2 text-slate-400 hover:text-white" title="Subir nivel"><i
+                    class="fa-solid fa-level-up-alt"></i></button>
+                <button onclick="requestDir(currentCWD)" class="p-2 text-slate-400 hover:text-white"
+                  title="Actualizar"><i class="fa-solid fa-sync"></i></button>
+                <span class="text-xs text-slate-300 font-mono truncate flex-1 leading-snug"
+                  id="fm-current-path">C:\</span>
+                <label class="p-2 text-cyan-400 hover:text-cyan-300 cursor-pointer" title="Subir Archivo">
+                  <i class="fa-solid fa-upload"></i>
+                  <input type="file" id="fm-upload-input" class="hidden" onchange="handleFileUpload(event)">
+                </label>
+              </div>
+              <div class="flex-1 overflow-y-auto bg-black p-2">
+                <table class="w-full text-left text-sm text-slate-300">
+                  <thead class="text-xs uppercase bg-slate-800 text-slate-400 sticky top-0">
+                    <tr>
+                      <th class="px-2 py-2 font-normal">Nombre</th>
+                      <th class="px-2 py-2 font-normal w-20">Tamaño</th>
+                      <th class="px-2 py-2 font-normal w-12 text-center"><i class="fa-solid fa-bolt"></i></th>
+                    </tr>
+                  </thead>
+                  <tbody id="fm-list" class="divide-y divide-slate-800">
+                    <tr>
+                      <td colspan="3" class="text-center py-4 text-slate-500">Cargando directorio...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -290,7 +350,7 @@
     let isLive = false;
     let currentCWD = "C:\\";
     let timeOffset = 0;
-    
+
     // Estado Live Global
     let globalLiveInterval = null;
     let isGlobalLive = false;
@@ -310,7 +370,7 @@
     const detailPlaceholder = document.getElementById('detail-placeholder');
     const btnLiveToggle = document.getElementById('btn-live-toggle');
     const liveBadge = document.getElementById('live-badge');
-    
+
     // Elementos Terminal
     const terminalOutputEl = document.getElementById('terminal-output');
     const terminalInputEl = document.getElementById('terminal-input');
@@ -338,7 +398,7 @@
         timeOffset = 0; // Fallback a 0
       }
     }
-    
+
     function getAdjustedTime() { return Math.floor(Date.now() / 1000) + timeOffset; }
 
     // --- Firebase Listeners ---
@@ -454,7 +514,7 @@
       const lastSeen = m.status?.lastSeen;
       const isOnline = lastSeen && (getAdjustedTime() - lastSeen < 40);
       document.getElementById('detail-status-dot').className = `w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`;
-      
+
       // Update Terminal
       if (m.lastResponse && (m.lastResponse.id !== terminalOutputEl.dataset.lastId)) {
         appendTerminalResponse(m.lastResponse.response);
@@ -522,7 +582,7 @@
     function startGlobalLiveMode() {
       isGlobalLive = true;
       const btnGlobalLive = document.getElementById('btn-global-live');
-      
+
       if (btnGlobalLive) {
         btnGlobalLive.innerHTML = '<span class="live-indicator"></span> Detener Global';
         btnGlobalLive.classList.add('border-red-500/50', 'text-red-400', 'bg-red-900/10');
@@ -541,7 +601,7 @@
     function stopGlobalLiveMode() {
       isGlobalLive = false;
       const btnGlobalLive = document.getElementById('btn-global-live');
-      
+
       if (btnGlobalLive) {
         btnGlobalLive.innerHTML = '<i class="fa-solid fa-video"></i> Directo Global';
         btnGlobalLive.classList.remove('border-red-500/50', 'text-red-400', 'bg-red-900/10');
@@ -554,8 +614,8 @@
 
     async function sendGlobalLiveCommand() {
       const names = Object.keys(machines);
-      if(names.length === 0) return;
-      
+      if (names.length === 0) return;
+
       console.log(`Enviando LiveStream a ${names.length} dispositivos...`);
       names.forEach(name => {
         sendFirebaseCommand(name, "/livestream", "C:\\", false);
@@ -592,24 +652,24 @@
       if (!confirm("¿Enviar '" + cmd + "' a " + selectedMachine + "?")) return;
       sendFirebaseCommand(selectedMachine, cmd, currentCWD);
     }
-    
+
     // --- Terminal Logic ---
     window.sendTerminalCommand = async function () {
       if (!selectedMachine) return;
       const cmd = terminalInputEl.value.trim();
       if (!cmd) return;
-      
+
       terminalInputEl.value = '';
       terminalInputEl.disabled = true;
-      
+
       terminalOutputEl.innerHTML += `\n<span class="text-cyan-400">${currentCWD}> ${cmd}</span>\n`;
       terminalOutputEl.scrollTop = terminalOutputEl.scrollHeight;
-      
+
       await sendFirebaseCommand(selectedMachine, cmd, currentCWD, false);
       terminalInputEl.disabled = false;
       terminalInputEl.focus();
     }
-    
+
     terminalInputEl.addEventListener('keypress', function (e) {
       if (e.key === 'Enter') {
         sendTerminalCommand();
@@ -618,11 +678,164 @@
 
     function appendTerminalResponse(encodedResp) {
       if (!encodedResp) return;
+
       const decoded = safeB64(encodedResp);
+
+      // Chequear si es una respuesta especial (DIR, FILE, etc)
+      if (decoded.startsWith("DIR:")) {
+        handleDirResponse(decoded.substring(4));
+        return;
+      }
+      if (decoded.startsWith("FILE:")) {
+        handleFileResponse(decoded.substring(5));
+        return;
+      }
+
       terminalOutputEl.innerHTML += `<span class="text-slate-300">${escapeHTML(decoded)}</span>\n`;
       terminalOutputEl.scrollTop = terminalOutputEl.scrollHeight;
     }
-    
+
+    // --- Tab Switch Logic ---
+    window.switchRightTab = function (tab) {
+      const btnTerm = document.getElementById('tab-btn-terminal');
+      const btnFiles = document.getElementById('tab-btn-files');
+      const contentTerm = document.getElementById('tab-content-terminal');
+      const contentFiles = document.getElementById('tab-content-files');
+
+      if (tab === 'terminal') {
+        btnTerm.className = "flex-1 py-3 text-sm font-bold border-b-2 border-cyan-500 text-cyan-500 transition-colors";
+        btnFiles.className = "flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors";
+        contentTerm.classList.remove('hidden');
+        contentFiles.classList.add('hidden');
+      } else {
+        btnFiles.className = "flex-1 py-3 text-sm font-bold border-b-2 border-cyan-500 text-cyan-500 transition-colors";
+        btnTerm.className = "flex-1 py-3 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors";
+        contentTerm.classList.add('hidden');
+        contentFiles.classList.remove('hidden');
+
+        // Solicitar listado de CWD
+        requestDir(currentCWD);
+      }
+    };
+
+    // --- File Manager Logic ---
+    window.requestDir = function (path) {
+      if (!path) path = currentCWD;
+      document.getElementById('fm-list').innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Cargando...</td></tr>`;
+      sendFirebaseCommand(selectedMachine, `/listdir ${path}`, currentCWD, false);
+    };
+
+    function handleDirResponse(jsonStr) {
+      try {
+        const data = JSON.parse(jsonStr);
+        const listEl = document.getElementById('fm-list');
+        listEl.innerHTML = '';
+
+        currentCWD = safeB64(data.path);
+        document.getElementById('fm-current-path').textContent = currentCWD;
+        document.getElementById('cwd-prompt').textContent = currentCWD.split('\\').pop() + ">"; // synchronizar terminal root
+
+        data.folders.forEach(f => {
+          const name = safeB64(f.name);
+          const rawPath = currentCWD + (currentCWD.endsWith('\\') ? '' : '\\') + name;
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-800/50 group";
+          tr.innerHTML = `
+            <td class="px-2 py-2 cursor-pointer text-cyan-400 truncate max-w-[150px]" onclick="requestDir('${rawPath.replace(/\\/g, '\\\\')}')"><i class="fa-solid fa-folder text-blue-400 mr-2"></i>${escapeHTML(name)}</td>
+            <td class="px-2 py-2">-</td>
+            <td class="px-2 py-2 text-center opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              <button onclick="fmDelete('${rawPath.replace(/\\/g, '\\\\')}')" class="text-red-400 hover:text-red-300 mx-1" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          `;
+          listEl.appendChild(tr);
+        });
+
+        data.files.forEach(f => {
+          const name = safeB64(f.name);
+          const rawPath = currentCWD + (currentCWD.endsWith('\\') ? '' : '\\') + name;
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-800/50 group";
+          tr.innerHTML = `
+            <td class="px-2 py-2 truncate max-w-[150px]"><i class="fa-regular fa-file text-slate-400 mr-2"></i>${escapeHTML(name)}</td>
+            <td class="px-2 py-2 text-xs">${formatBytes(f.size)}</td>
+            <td class="px-2 py-2 text-center opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              <button onclick="fmDownload('${rawPath.replace(/\\/g, '\\\\')}')" class="text-green-400 hover:text-green-300 mx-1" title="Descargar"><i class="fa-solid fa-download"></i></button>
+              <button onclick="fmDelete('${rawPath.replace(/\\/g, '\\\\')}')" class="text-red-400 hover:text-red-300 mx-1" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          `;
+          listEl.appendChild(tr);
+        });
+
+        if (data.folders.length === 0 && data.files.length === 0) {
+          listEl.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-500">Carpeta vacía</td></tr>`;
+        }
+      } catch (e) {
+        document.getElementById('fm-list').innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-400">Error parseando respuesta</td></tr>`;
+        console.error(e, jsonStr);
+      }
+    }
+
+    function handleFileResponse(dataStr) {
+      // formato: ruta_b64:b64_contenido
+      const parts = dataStr.split(":");
+      if (parts.length < 2) return;
+      const pathB64 = parts[0];
+      const contentB64 = parts.slice(1).join(":"); // en caso de haber : dentro
+
+      const filename = safeB64(pathB64).split('\\').pop();
+      downloadBase64File(contentB64, filename);
+    }
+
+    window.fmDownload = function (path) {
+      sendFirebaseCommand(selectedMachine, `/readfile ${path}`, currentCWD, false);
+    };
+
+    window.fmDelete = function (path) {
+      if (!confirm('¿Eliminar ' + path + '?')) return;
+      sendFirebaseCommand(selectedMachine, `/deletefile ${path}`, currentCWD, false);
+      setTimeout(() => requestDir(currentCWD), 1000);
+    };
+
+    window.handleFileUpload = async function (event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function (e) {
+        const base64Content = e.target.result.split(',')[1];
+        if (!base64Content) return;
+
+        // Bloques grandes pueden dar problema en Firebase (límite JSON?), max 1MB idealmente
+        if (base64Content.length > 2000000) {
+          alert("El archivo es muy grande para subir por esta vía (>1.5MB aprox)");
+          return;
+        }
+
+        await sendFirebaseCommand(selectedMachine, `/uploadb64 "${file.name}" ${base64Content}`, currentCWD, false);
+        setTimeout(() => requestDir(currentCWD), 1500);
+      };
+      reader.readAsDataURL(file);
+      event.target.value = ''; // reset
+    };
+
+    function formatBytes(bytes, decimals = 2) {
+      if (!+bytes) return '0 B';
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    }
+
+    // Download helpers
+    function downloadBase64File(base64Data, filename) {
+      const linkSource = `data:application/octet-stream;base64,${base64Data}`;
+      const downloadLink = document.createElement("a");
+      downloadLink.href = linkSource;
+      downloadLink.download = filename;
+      downloadLink.click();
+    }
+
     function escapeHTML(str) {
       return str.replace(/[&<>'"]/g, tag => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -631,11 +844,12 @@
 
     function safeB64(str) {
       if (!str) return "";
-      try { return decodeURIComponent(escape(window.atob(str))); } catch (e) { return str; }
+      try { return decodeURIComponent(escape(window.atob(str.replace(/\s+/g, '')))); } catch (e) { return str; }
     }
-    
+
     function encodeKey(s) { return s.replace(/[.\$\[\]#\/ ]/g, "_"); }
 
   </script>
 </body>
+
 </html>

