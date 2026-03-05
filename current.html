@@ -195,7 +195,7 @@
         </div>
 
         <!-- Área Principal Dividida -->
-        <div class="flex-1 flex overflow-hidden">
+        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
           <!-- Izquierda: Monitor / Screenshot -->
           <div class="flex-1 bg-black relative flex items-center justify-center overflow-hidden p-4">
             <div id="live-badge" class="absolute top-6 left-6 z-20 hidden">
@@ -213,6 +213,20 @@
               <p>Sin señal de video</p>
               <p class="text-sm mt-2">Pulsa "Ver en Directo" o captura una imagen.</p>
             </div>
+          </div>
+          
+          <!-- Derecha: Terminal -->
+          <div class="w-full lg:w-[400px] h-64 lg:h-full flex flex-col bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 z-10">
+             <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+               <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-terminal text-cyan-500"></i> Terminal CMD</h3>
+               <button onclick="document.getElementById('terminal-output').innerHTML=''" class="text-slate-400 hover:text-white text-xs"><i class="fa-solid fa-trash"></i></button>
+             </div>
+             <div class="flex-1 p-3 overflow-y-auto font-mono text-xs text-green-400 bg-black whitespace-pre-wrap selection:bg-green-900 break-all" id="terminal-output"></div>
+             <div class="p-3 border-t border-slate-800 bg-slate-900 flex gap-2">
+               <span class="text-slate-500 font-mono mt-2" id="cwd-prompt">C:\></span>
+               <input type="text" id="terminal-input" class="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-2 text-sm text-white font-mono focus:outline-none focus:border-cyan-500" placeholder="dir, echo hola...">
+               <button onclick="sendTerminalCommand()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 rounded transition-colors"><i class="fa-solid fa-play"></i></button>
+             </div>
           </div>
         </div>
       </div>
@@ -296,6 +310,11 @@
     const detailPlaceholder = document.getElementById('detail-placeholder');
     const btnLiveToggle = document.getElementById('btn-live-toggle');
     const liveBadge = document.getElementById('live-badge');
+    
+    // Elementos Terminal
+    const terminalOutputEl = document.getElementById('terminal-output');
+    const terminalInputEl = document.getElementById('terminal-input');
+    const cwdPromptEl = document.getElementById('cwd-prompt');
 
     // Init Logic
     window.addEventListener('load', async () => {
@@ -389,6 +408,7 @@
 
       const cwdEncoded = machines[name]?.info?.cwd;
       currentCWD = cwdEncoded ? safeB64(cwdEncoded) : "C:\\";
+      cwdPromptEl.textContent = currentCWD.split('\\').pop() + ">";
 
       // Stop anterior live mode individual
       stopLiveMode();
@@ -434,6 +454,12 @@
       const lastSeen = m.status?.lastSeen;
       const isOnline = lastSeen && (getAdjustedTime() - lastSeen < 40);
       document.getElementById('detail-status-dot').className = `w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`;
+      
+      // Update Terminal
+      if (m.lastResponse && (m.lastResponse.id !== terminalOutputEl.dataset.lastId)) {
+        appendTerminalResponse(m.lastResponse.response);
+        terminalOutputEl.dataset.lastId = m.lastResponse.id;
+      }
     }
 
     function updateDetailImage(b64) {
@@ -565,6 +591,42 @@
       if (!selectedMachine) return;
       if (!confirm("¿Enviar '" + cmd + "' a " + selectedMachine + "?")) return;
       sendFirebaseCommand(selectedMachine, cmd, currentCWD);
+    }
+    
+    // --- Terminal Logic ---
+    window.sendTerminalCommand = async function () {
+      if (!selectedMachine) return;
+      const cmd = terminalInputEl.value.trim();
+      if (!cmd) return;
+      
+      terminalInputEl.value = '';
+      terminalInputEl.disabled = true;
+      
+      terminalOutputEl.innerHTML += `\n<span class="text-cyan-400">${currentCWD}> ${cmd}</span>\n`;
+      terminalOutputEl.scrollTop = terminalOutputEl.scrollHeight;
+      
+      await sendFirebaseCommand(selectedMachine, cmd, currentCWD, false);
+      terminalInputEl.disabled = false;
+      terminalInputEl.focus();
+    }
+    
+    terminalInputEl.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        sendTerminalCommand();
+      }
+    });
+
+    function appendTerminalResponse(encodedResp) {
+      if (!encodedResp) return;
+      const decoded = safeB64(encodedResp);
+      terminalOutputEl.innerHTML += `<span class="text-slate-300">${escapeHTML(decoded)}</span>\n`;
+      terminalOutputEl.scrollTop = terminalOutputEl.scrollHeight;
+    }
+    
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[tag] || tag));
     }
 
     function safeB64(str) {

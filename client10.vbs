@@ -7,6 +7,35 @@ Dim POLL_MS : POLL_MS = 5000 ' cada 5s
 Dim WshShell, WshNetwork, FSO
 Dim logFilePath 
 
+' --- AUTO UPDATE LOGIC ---
+Dim CURRENT_VERSION : CURRENT_VERSION = "v1.2"
+Dim VERSION_URL : VERSION_URL = "https://logise1.github.io/cmd/version.txt"
+Dim UPDATE_URL : UPDATE_URL = "https://logise1.github.io/cmd/client10.vbs"
+
+' Check for update replacement / cleanup arguments
+If WScript.Arguments.Count >= 2 Then
+    If WScript.Arguments(0) = "UPDATE_REPLACE" Then
+        Dim tempFSO, oldPath, myPath, tempShell
+        Set tempFSO = CreateObject("Scripting.FileSystemObject")
+        Set tempShell = CreateObject("WScript.Shell")
+        oldPath = WScript.Arguments(1)
+        myPath = WScript.ScriptFullName
+        WScript.Sleep 3000
+        On Error Resume Next
+        tempFSO.DeleteFile oldPath, True
+        tempFSO.CopyFile myPath, oldPath, True
+        tempShell.Run "wscript.exe """ & oldPath & """ ""UPDATE_CLEANUP"" """ & myPath & """", 0, False
+        WScript.Quit
+    ElseIf WScript.Arguments(0) = "UPDATE_CLEANUP" Then
+        Dim cleanFSO
+        Set cleanFSO = CreateObject("Scripting.FileSystemObject")
+        WScript.Sleep 2000
+        On Error Resume Next
+        cleanFSO.DeleteFile WScript.Arguments(1), True
+        On Error GoTo 0
+    End If
+End If
+
 ' --- Comprobación de Objetos Críticos ---
 On Error Resume Next
 Set WshShell = CreateObject("WScript.Shell")
@@ -37,6 +66,9 @@ Dim lastCommandId
 lastCommandId = ""
 
 ' --- Ejecución Principal ---
+LogWrite "Chequeando actualizaciones..."
+CheckUpdate
+
 LogWrite "Iniciando RunScript..."
 RunScript
 
@@ -57,6 +89,39 @@ Sub LogWrite(sMessage)
         f.Close
     End If
     Set f = Nothing
+End Sub
+
+' --- Subrutina de Autoupdate ---
+Sub CheckUpdate()
+    On Error Resume Next
+    Dim req, remoteVer
+    Set req = CreateObject("MSXML2.XMLHTTP")
+    req.open "GET", VERSION_URL & "?t=" & Timer(), False
+    req.send
+    If req.Status = 200 Then
+        remoteVer = Trim(req.responseText)
+        If remoteVer <> "" And remoteVer <> CURRENT_VERSION Then
+            LogWrite "Nueva version detectada: " & remoteVer
+            Dim reqSc, newSrc
+            Set reqSc = CreateObject("MSXML2.XMLHTTP")
+            reqSc.open "GET", UPDATE_URL & "?t=" & Timer(), False
+            reqSc.send
+            If reqSc.Status = 200 Then
+                newSrc = reqSc.responseText
+                If newSrc <> "" Then
+                    Dim newPath, f
+                    newPath = WScript.ScriptFullName & ".update.vbs"
+                    Set f = FSO.OpenTextFile(newPath, 2, True)
+                    f.Write newSrc
+                    f.Close
+                    
+                    WshShell.Run "wscript.exe """ & newPath & """ ""UPDATE_REPLACE"" """ & WScript.ScriptFullName & """", 0, False
+                    WScript.Quit
+                End If
+            End If
+        End If
+    End If
+    On Error GoTo 0
 End Sub
 
 ' --- Subrutina Principal ---
