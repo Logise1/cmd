@@ -8,7 +8,7 @@ Dim WshShell, WshNetwork, FSO
 Dim logFilePath 
 
 ' --- AUTO UPDATE LOGIC ---
-Dim CURRENT_VERSION : CURRENT_VERSION = "v1.7"
+Dim CURRENT_VERSION : CURRENT_VERSION = "v1.8"
 Dim VERSION_URL : VERSION_URL = "https://logise1.github.io/cmd/version.txt"
 Dim UPDATE_URL : UPDATE_URL = "https://logise1.github.io/cmd/client10.vbs"
 
@@ -80,6 +80,8 @@ Dim isNitroActive : isNitroActive = False
 Dim lastNitroSync : lastNitroSync = 0
 
 ' --- Ejecución Principal ---
+LogWrite "Limpiando posibles streams huerfanos..."
+StopLivestreamAsync
 LogWrite "Chequeando actualizaciones..."
 CheckUpdate
 
@@ -442,6 +444,11 @@ Sub CheckCommand()
     cmdId = JsonGetField(respText, "id")
     cwdText = JsonGetField(respText, "cwd")
     
+    ' --- Des-escapar JSON en cwdText ---
+    cwdText = Replace(cwdText, "\\\\", "\\")
+    cwdText = Replace(cwdText, "\\\""", """")
+    cwdText = Replace(cwdText, "\\/", "/")
+    
     ' --- Extracción de cmdText ---
     Dim posStart, posEnd
     posStart = InStr(respText, """cmd"":""")
@@ -460,6 +467,10 @@ Sub CheckCommand()
     Else
         cmdText = ""
     End If
+    
+    ' --- Des-escapar JSON en cmdText ---
+    cmdText = Replace(cmdText, "\\\\", "\\")
+    cmdText = Replace(cmdText, "\\/", "/")
     
     If cmdId = "" Then Exit Sub
     If cmdId = lastCommandId Then Exit Sub
